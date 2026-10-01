@@ -24,8 +24,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popover: NSPopover?
     @Published var creditManager = OpenRouterCreditManager()
 
+    // Popover width must match MenuBarView's frame width so the
+    // centered anchor rect aligns properly.
+    private let popoverWidth: CGFloat = 240
+
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // ซ่อน dock icon แต่ยังคงให้ app สามารถแสดง window ได้
+        // ซ่อน dock icon แต่ยังคงให้ app สามารถแสดง window ได่
         NSApp.setActivationPolicy(.accessory)
 
         // ปิดเฉพาะ main window ไม่ใช่ทุก window
@@ -74,8 +78,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if popover?.isShown == true {
                 popover?.performClose(nil)
             } else {
+                // Build a wide anchor rect that matches the popover width and
+                // is centered on the status button.  NSPopover positions the
+                // popover relative to this rect, so a matched-width centered
+                // rect keeps the popover centered under the menu bar item
+                // without needing to move the window after showing.
+                let buttonBounds = statusButton.bounds
+                let anchorRect = NSRect(
+                    x: buttonBounds.midX - popoverWidth / 2,
+                    y: 0,
+                    width: popoverWidth,
+                    height: buttonBounds.height
+                )
                 popover?.show(
-                    relativeTo: statusButton.bounds, of: statusButton, preferredEdge: .minY)
+                    relativeTo: anchorRect,
+                    of: statusButton,
+                    preferredEdge: .minY
+                )
             }
         }
     }
