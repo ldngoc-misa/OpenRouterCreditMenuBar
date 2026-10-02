@@ -24,6 +24,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popover: NSPopover?
     @Published var creditManager = OpenRouterCreditManager()
 
+    // Bộ theo dõi sự kiện chuột để tự đóng popover khi click ra ngoài
+    private var localEventMonitor: Any?
+    private var globalEventMonitor: Any?
+
     // Popover width must match MenuBarView's frame width so the
     // centered anchor rect aligns properly.
     private let popoverWidth: CGFloat = 240
@@ -53,6 +57,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 .environmentObject(creditManager)
         )
         popover?.behavior = .transient
+
+        // .transient không đóng đáng tin cậy với app accessory,
+        // nên thêm event monitor để tự đóng khi click ra ngoài
+        setupOutsideClickDismissal()
 
         // เริ่ม fetch credit
         Task {
@@ -97,6 +105,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             }
         }
+    }
+
+    // MARK: - Tự đóng popover khi click ra ngoài
+
+    private func setupOutsideClickDismissal() {
+        // Click trong các window của chính app (vd: cửa sổ Settings)
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            self?.dismissPopoverIfClickOutside(event)
+            return event
+        }
+        // Click ở các app khác
+        globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            self?.dismissPopoverIfClickOutside(event)
+        }
+    }
+
+    private func dismissPopoverIfClickOutside(_ event: NSEvent) {
+        guard let popover, popover.isShown else { return }
+
+        // Bỏ qua click vào chính nút status item (showMenu() sẽ tự toggle)
+        if let button = statusItem?.button,
+           let buttonWindow = button.window,
+           let cgEvent = event.cgEvent {
+            let buttonScreenFrame = buttonWindow.convertToScreen(button.frame)
+            if buttonScreenFrame.contains(cgEvent.location) {
+                return
+            }
+        }
+
+        // Bỏ qua click bên trong popover (event.window chỉ có từ local monitor)
+        if let popoverWindow = popover.contentViewController?.view.window,
+           event.window === popoverWindow {
+            return
+        }
+
+        popover.performClose(nil)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let localEventMonitor { NSEvent.removeMonitor(localEventMonitor) }
+        if let globalEventMonitor { NSEvent.removeMonitor(globalEventMonitor) }
     }
 
     func updateMenuBarTitle() {

@@ -74,6 +74,22 @@ struct SettingsToolbarButton: View {
 struct MenuBarView: View {
     @EnvironmentObject var creditManager: OpenRouterCreditManager
 
+    /// Label showing which day the "Spend" value refers to.
+    /// Days are compared in UTC to stay consistent with the API's UTC-based data.
+    private var spentTodayLabel: String {
+        guard let date = creditManager.spentTodayDate else { return "Spend Today" }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        if calendar.isDate(date, inSameDayAs: Date()) {
+            return "Spend Today"
+        }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()),
+           calendar.isDate(date, inSameDayAs: yesterday) {
+            return "Spend Yesterday"
+        }
+        return "Spend \(date.formatted(date: .abbreviated, time: .omitted))"
+    }
+
     var body: some View {
         VStack(spacing: 8) {
             // MARK: - Area 1: Title (compact)
@@ -104,15 +120,22 @@ struct MenuBarView: View {
                     }
                 } else if let credit = creditManager.currentCredit {
                     HStack(alignment: .top, spacing: 12) {
-                        // Spent Today column (left)
+                        // Spend Today column (left)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Spent Today")
+                            Text(spentTodayLabel)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("$0.00")
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.secondary)
+                            if let spentToday = creditManager.spentToday {
+                                Text("$\(String(format: "%.4f", spentToday))")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text("--")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 

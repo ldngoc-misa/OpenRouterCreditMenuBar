@@ -40,6 +40,11 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		21B1007B306F4C5800FCB584 /* References */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = References;
+			sourceTree = "<group>";
+		};
 		3AB0A1202DE1C32E000AA503 /* OpenRouterCreditMenuBar */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -88,6 +93,7 @@
 		3AB0A1152DE1C32E000AA503 = {
 			isa = PBXGroup;
 			children = (
+				21B1007B306F4C5800FCB584 /* References */,
 				3AB0A1202DE1C32E000AA503 /* OpenRouterCreditMenuBar */,
 				3AB0A12F2DE1C330000AA503 /* OpenRouterCreditMenuBarTests */,
 				3AB0A1392DE1C330000AA503 /* OpenRouterCreditMenuBarUITests */,
@@ -121,6 +127,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				21B1007B306F4C5800FCB584 /* References */,
 				3AB0A1202DE1C32E000AA503 /* OpenRouterCreditMenuBar */,
 			);
 			name = OpenRouterCreditMenuBar;
