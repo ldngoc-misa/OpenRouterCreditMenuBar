@@ -5,6 +5,72 @@
 
 import SwiftUI
 
+// Custom toolbar button with hover effect
+struct ToolbarButton: View {
+    let systemName: String
+    let tooltip: String
+    let action: () -> Void
+    @State private var isHovering = false
+    
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isHovering ? Color.white.opacity(0.2) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(tooltip)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+}
+
+// Toolbar button content for use inside SettingsLink (unused - keeping for reference)
+// struct ToolbarButtonContent: View {
+//     let systemName: String
+//     @State private var isHovering = false
+//     
+//     var body: some View {
+//         Image(systemName: systemName)
+//             .font(.system(size: 14, weight: .medium))
+//             .foregroundColor(.white)
+//             .frame(width: 28, height: 28)
+//             .background(
+//                 RoundedRectangle(cornerRadius: 6)
+//                     .fill(isHovering ? Color.white.opacity(0.2) : Color.clear)
+//             )
+//             .onHover { hovering in
+//                 isHovering = hovering
+//             }
+//     }
+// }
+
+// Toolbar button with hover effect for use inside SettingsLink
+struct SettingsToolbarButton: View {
+    let systemName: String
+    @State private var isHovering = false
+    
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 14, weight: .medium))
+            .foregroundColor(.white)
+            .frame(width: 28, height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isHovering ? Color.white.opacity(0.2) : Color.clear)
+            )
+            .onHover { hovering in
+                isHovering = hovering
+            }
+    }
+}
+
 struct MenuBarView: View {
     @EnvironmentObject var creditManager: OpenRouterCreditManager
 
@@ -116,45 +182,38 @@ struct MenuBarView: View {
 
             Divider()
 
-            // MARK: - Area 4: Toolbar (icon-only with tooltips)
-            HStack(spacing: 16) {
-                Button(action: {
+            // MARK: - Area 4: Toolbar (icon-only with tooltips + hover)
+            HStack(spacing: 8) {
+                ToolbarButton(
+                    systemName: "arrow.clockwise",
+                    tooltip: "Refresh"
+                ) {
                     Task {
                         await creditManager.fetchCredit()
                     }
-                }) {
-                    Image(systemName: "arrow.clockwise")
-                        .foregroundColor(.white)
                 }
-                .help("Refresh")
-                .buttonStyle(.plain)
 
-                Button(action: {
+                ToolbarButton(
+                    systemName: "globe",
+                    tooltip: "View Activity"
+                ) {
                     if let url = URL(string: "https://openrouter.ai/activity") {
                         NSWorkspace.shared.open(url)
                     }
-                }) {
-                    Image(systemName: "globe")
-                        .foregroundColor(.white)
                 }
-                .help("View Activity")
-                .buttonStyle(.plain)
 
                 SettingsLink {
-                    Image(systemName: "gearshape")
-                        .foregroundColor(.white)
+                    SettingsToolbarButton(systemName: "gearshape")
                 }
+                .buttonStyle(.plain)
                 .help("Settings")
-                .buttonStyle(.plain)
 
-                Button(action: {
+                ToolbarButton(
+                    systemName: "power",
+                    tooltip: "Quit"
+                ) {
                     NSApplication.shared.terminate(nil)
-                }) {
-                    Image(systemName: "power")
-                        .foregroundColor(.white)
                 }
-                .help("Quit")
-                .buttonStyle(.plain)
             }
             .padding(.vertical, 6)
         }
