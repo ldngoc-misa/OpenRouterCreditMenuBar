@@ -31,6 +31,93 @@ struct ToolbarButton: View {
     }
 }
 
+// Popover view for spend today by model
+struct SpendTodayPopover: View {
+    let modelSpending: [ModelSpending]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Spend Today by Model")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+                .textCase(.uppercase)
+            
+            if modelSpending.isEmpty {
+                Text("No spend data available")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 8)
+            } else {
+                ForEach(modelSpending.prefix(10)) { spending in
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(spending.providerColor)
+                            .frame(width: 8, height: 8)
+                        Text(spending.modelName)
+                            .font(.caption)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Text("$\(String(format: "%.4f", spending.amount))")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                if modelSpending.count > 10 {
+                    Text("... and \(modelSpending.count - 10) more")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 4)
+                }
+            }
+        }
+        .padding(12)
+        .frame(width: 300)
+    }
+}
+
+// Spend today amount view with hover popover
+struct SpendTodayAmountView: View {
+    let label: String
+    let amount: Double?
+    let modelSpending: [ModelSpending]
+    @State private var showPopover = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Group {
+                if let amount = amount {
+                    Text("$\(String(format: "%.4f", amount))")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("--")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .onHover { hovering in
+                showPopover = hovering
+            }
+            .popover(isPresented: $showPopover) {
+                SpendTodayPopover(modelSpending: modelSpending)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 // Toolbar button content for use inside SettingsLink (unused - keeping for reference)
 // struct ToolbarButtonContent: View {
 //     let systemName: String
@@ -120,24 +207,12 @@ struct MenuBarView: View {
                     }
                 } else if let credit = creditManager.currentCredit {
                     HStack(alignment: .top, spacing: 12) {
-                        // Spend Today column (left)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(spentTodayLabel)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            if let spentToday = creditManager.spentToday {
-                                Text("$\(String(format: "%.4f", spentToday))")
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.secondary)
-                            } else {
-                                Text("--")
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        // Spend Today column (left) - with hover popover
+                        SpendTodayAmountView(
+                            label: spentTodayLabel,
+                            amount: creditManager.spentToday,
+                            modelSpending: creditManager.spentTodayByModel
+                        )
 
                         // Available column (right)
                         VStack(alignment: .leading, spacing: 2) {

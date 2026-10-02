@@ -4,6 +4,47 @@
 //
 
 import Foundation
+import SwiftUI
+
+struct ModelSpending: Identifiable {
+    let id = UUID()
+    let modelName: String
+    let providerName: String
+    let amount: Double
+    
+    var providerColor: Color {
+        ProviderColors.color(for: providerName)
+    }
+}
+
+struct ProviderColors {
+    static func color(for provider: String) -> Color {
+        let lowercased = provider.lowercased()
+        if lowercased.contains("anthropic") || lowercased.contains("claude") {
+            return Color(red: 0.85, green: 0.45, blue: 0.15)  // Claude orange/brown
+        } else if lowercased.contains("openai") {
+            return Color(red: 0.0, green: 0.6, blue: 0.2)  // OpenAI green
+        } else if lowercased.contains("google") || lowercased.contains("gemini") {
+            return Color(red: 0.25, green: 0.52, blue: 0.96)  // Google blue
+        } else if lowercased.contains("meta") || lowercased.contains("llama") {
+            return Color(red: 0.0, green: 0.5, blue: 0.85)  // Meta blue
+        } else if lowercased.contains("mistral") {
+            return Color(red: 0.9, green: 0.3, blue: 0.25)  // Mistral red/orange
+        } else if lowercased.contains("cohere") {
+            return Color(red: 0.5, green: 0.2, blue: 0.8)  // Cohere purple
+        } else if lowercased.contains("perplexity") {
+            return Color(red: 0.15, green: 0.65, blue: 0.85)  // Perplexity teal
+        } else if lowercased.contains("qwen") || lowercased.contains("alibaba") {
+            return Color(red: 0.95, green: 0.45, blue: 0.1)  // Qwen orange
+        } else if lowercased.contains("deepseek") {
+            return Color(red: 0.15, green: 0.7, blue: 0.4)  // DeepSeek green
+        } else if lowercased.contains("x.ai") || lowercased.contains("grok") {
+            return Color(red: 0.0, green: 0.0, blue: 0.0)  // x.ai black
+        } else {
+            return Color.secondary  // Default gray
+        }
+    }
+}
 
 class OpenRouterCreditManager: ObservableObject {
     @Published var currentCredit: Double?
@@ -11,6 +52,7 @@ class OpenRouterCreditManager: ObservableObject {
     @Published var spentToday: Double?
     /// The UTC day that `spentToday` refers to (start of the current UTC day).
     @Published var spentTodayDate: Date?
+    @Published var spentTodayByModel: [ModelSpending] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -85,11 +127,13 @@ class OpenRouterCreditManager: ObservableObject {
         do {
             let creditData = try await fetchCreditFromAPI()
             let spentToday = try await fetchSpentTodayFromAPI()
+            let spentTodayByModel = try await fetchSpentTodayByModelFromAPI()
             await MainActor.run {
                 self.currentCredit = creditData.total_credits - creditData.total_usage
                 self.totalUsage = creditData.total_usage
                 self.spentToday = spentToday.amount
                 self.spentTodayDate = spentToday.date
+                self.spentTodayByModel = spentTodayByModel
                 self.isLoading = false
             }
         } catch {
@@ -147,7 +191,9 @@ class OpenRouterCreditManager: ObservableObject {
             time_range: .init(
                 start: Self.iso8601SecondsString(for: startOfTodayUTC),
                 end: Self.iso8601SecondsString(for: Date())
-            )
+            ),
+            dimensions: nil,
+            granularity: nil
         )
 
         guard let url = URL(string: "https://openrouter.ai/api/v1/analytics/query") else {
@@ -172,18 +218,18 @@ class OpenRouterCreditManager: ObservableObject {
         }
 
         let result = try JSONDecoder().decode(AnalyticsQueryResponse.self, from: data)
-        // Response rows are schemaless in the spec: metric-name → value dictionaries.
+        // Response rows are flat objects with dimension values and metric values as properties.
         var amount = 0.0
         for row in result.data.data {
-            amount += row.objectValues?[Self.spentUsageMetric]?.numberValue ?? 0
+            amount += row.value(forKey: Self.spentUsageMetric)?.numberValue ?? 0
         }
         // If the metric key is missing entirely, the name is probably wrong —
         // surface the actual row keys so the correct one can be identified.
-        if let firstRowValues = result.data.data.first?.objectValues,
-           !firstRowValues.keys.contains(Self.spentUsageMetric) {
+        if let firstRow = result.data.data.first,
+           firstRow.value(forKey: Self.spentUsageMetric) == nil {
             throw OpenRouterAPIError(
                 statusCode: 200,
-                serverMessage: "No '\(Self.spentUsageMetric)' metric in response. Row keys: \(firstRowValues.keys.sorted().joined(separator: ", "))"
+                serverMessage: "No '\(Self.spentUsageMetric)' metric in response. Row keys: \(firstRow.rawValues.keys.sorted().joined(separator: ", "))"
             )
         }
         return (amount, startOfTodayUTC)
@@ -197,6 +243,73 @@ class OpenRouterCreditManager: ObservableObject {
         formatter.timeZone = TimeZone(identifier: "UTC")
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
         return formatter.string(from: date)
+    }
+
+    // MARK: - Spend Today by Model
+
+    /// Fetches the live "spent today" breakdown by model (USD) via POST /analytics/query,
+    /// querying the range UTC today 00:00:00 → now, grouped by model.
+    private func fetchSpentTodayByModelFromAPI() async throws -> [ModelSpending] {
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let startOfTodayUTC = utcCalendar.startOfDay(for: Date())
+
+        let body = AnalyticsQueryRequest(
+            metrics: [Self.spentUsageMetric],
+            time_range: .init(
+                start: Self.iso8601SecondsString(for: startOfTodayUTC),
+                end: Self.iso8601SecondsString(for: Date())
+            ),
+            dimensions: ["model"],
+            granularity: nil
+        )
+
+        guard let url = URL(string: "https://openrouter.ai/api/v1/analytics/query") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+            httpResponse.statusCode == 200
+        else {
+            throw OpenRouterAPIError(
+                statusCode: (response as? HTTPURLResponse)?.statusCode ?? -1,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+
+        let result = try JSONDecoder().decode(AnalyticsQueryResponse.self, from: data)
+
+        var modelSpending: [ModelSpending] = []
+        for row in result.data.data {
+            // Extract model name from the row (dimension value)
+            let modelName = row.value(forKey: "model")?.stringValue ?? "Unknown"
+            
+            // Extract spend amount (metric value)
+            let amount = row.value(forKey: Self.spentUsageMetric)?.numberValue ?? 0
+            
+            // Skip models with zero spend
+            guard amount > 0 else { continue }
+            
+            // Extract provider name from model (e.g., "anthropic/claude-3.5-sonnet" -> "anthropic")
+            let providerName = modelName.components(separatedBy: "/").first?.lowercased() ?? "unknown"
+            
+            modelSpending.append(ModelSpending(
+                modelName: modelName,
+                providerName: providerName,
+                amount: amount
+            ))
+        }
+        
+        // Sort by amount descending
+        return modelSpending.sorted { $0.amount > $1.amount }
     }
 
     /// Extracts `error.message` from an OpenRouter error body, if present.
@@ -223,6 +336,8 @@ struct CreditData: Codable {
 struct AnalyticsQueryRequest: Codable {
     let metrics: [String]
     let time_range: TimeRange
+    let dimensions: [String]?
+    let granularity: String?
 
     struct TimeRange: Codable {
         /// ISO 8601 UTC with seconds (YYYY-MM-DDTHH:mm:ss'Z')
@@ -235,8 +350,24 @@ struct AnalyticsQueryResponse: Decodable {
     let data: Payload
 
     struct Payload: Decodable {
-        /// Schemaless rows: metric-name → value
-        let data: [JSONValue]
+        /// Each row is a flat object with dimension values and metric values as properties
+        let data: [AnalyticsRow]
+    }
+}
+
+struct AnalyticsRow: Decodable {
+    // Dynamic properties - dimension values and metric values
+    // We'll decode this manually
+    let rawValues: [String: JSONValue]
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let dict = try container.decode([String: JSONValue].self)
+        self.rawValues = dict
+    }
+    
+    func value(forKey key: String) -> JSONValue? {
+        return rawValues[key]
     }
 }
 
@@ -285,6 +416,11 @@ enum JSONValue: Decodable {
 
     var objectValues: [String: JSONValue]? {
         if case .object(let value) = self { return value }
+        return nil
+    }
+
+    var stringValue: String? {
+        if case .string(let value) = self { return value }
         return nil
     }
 }
