@@ -100,12 +100,10 @@ struct SpendTodayAmountView: View {
                     Text("$\(String(format: "%.4f", amount))")
                         .font(.title3)
                         .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
                 } else {
                     Text("--")
                         .font(.title3)
                         .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
                 }
             }
             .onHover { hovering in
