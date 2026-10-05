@@ -5,6 +5,21 @@
 
 import SwiftUI
 
+/// Formats a number in abbreviated form (e.g., 1.5K, 2.3M, 1.2B)
+func formatAbbreviated(_ number: Int) -> String {
+    let value = Double(number)
+    switch value {
+    case 1_000_000_000...:
+        return String(format: "%.1fB", value / 1_000_000_000)
+    case 1_000_000...:
+        return String(format: "%.1fM", value / 1_000_000)
+    case 1_000...:
+        return String(format: "%.1fK", value / 1_000)
+    default:
+        return "\(number)"
+    }
+}
+
 // Custom toolbar button with hover effect
 struct ToolbarButton: View {
     let systemName: String
@@ -117,6 +132,94 @@ struct SpendTodayAmountView: View {
     }
 }
 
+// Requests today amount view with hover popover
+struct RequestsTodayAmountView: View {
+    let label: String
+    let count: Int?
+    let modelRequests: [ModelRequests]
+    let popoverTitle: String
+    @State private var showPopover = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Group {
+                if let count = count {
+                    Text(formatAbbreviated(count))
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                } else {
+                    Text("--")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                }
+            }
+            .onHover { hovering in
+                showPopover = hovering
+            }
+            .popover(isPresented: $showPopover) {
+                RequestsTodayPopover(modelRequests: modelRequests, title: popoverTitle)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// Popover view for requests by model
+struct RequestsTodayPopover: View {
+    let modelRequests: [ModelRequests]
+    let title: String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+                .textCase(.uppercase)
+            
+            if modelRequests.isEmpty {
+                Text("No request data available")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 8)
+            } else {
+                ForEach(modelRequests.prefix(10)) { request in
+                    HStack(spacing: 8) {
+                        // Vertical pill/capsule shape - longer and narrower
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(request.providerColor)
+                            .frame(width: 4, height: 16)
+                        Text(request.modelName)
+                            .font(.caption)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Text(formatAbbreviated(request.count))
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                if modelRequests.count > 10 {
+                    Text("... and \(modelRequests.count - 10) more")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 4)
+                }
+            }
+        }
+        .padding(12)
+        .frame(width: 300)
+    }
+}
+
 // Toolbar button content for use inside SettingsLink (unused - keeping for reference)
 // struct ToolbarButtonContent: View {
 //     let systemName: String
@@ -175,6 +278,21 @@ struct MenuBarView: View {
         }
         return "Spend \(date.formatted(date: .abbreviated, time: .omitted))"
     }
+    
+    /// Label showing which day the "Requests" value refers to.
+    private var requestsTodayLabel: String {
+        guard let date = creditManager.requestsTodayDate else { return "Requests Today" }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        if calendar.isDate(date, inSameDayAs: Date()) {
+            return "Requests Today"
+        }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()),
+           calendar.isDate(date, inSameDayAs: yesterday) {
+            return "Requests Yesterday"
+        }
+        return "Requests \(date.formatted(date: .abbreviated, time: .omitted))"
+    }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -223,6 +341,54 @@ struct MenuBarView: View {
                                 .fontWeight(.semibold)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                } else if let error = creditManager.errorMessage {
+                    VStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundColor(.orange)
+                        Text("Error")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(error)
+                            .font(.caption2)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+            }
+
+            Divider()
+
+            // MARK: - Area 2b: Requests Information
+            VStack(alignment: .leading, spacing: 6) {
+                Text("REQUESTS")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+
+                if creditManager.isLoading {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading...")
+                            .font(.caption)
+                    }
+                } else if creditManager.requestsToday != nil {
+                    HStack(alignment: .top, spacing: 12) {
+                        // Requests Today column (left) - with hover popover
+                        RequestsTodayAmountView(
+                            label: "Today",
+                            count: creditManager.requestsToday,
+                            modelRequests: creditManager.requestsTodayByModel,
+                            popoverTitle: "Requests Today by Model"
+                        )
+
+                        // This Week column (right) - shows last 7 days requests with hover popover
+                        RequestsTodayAmountView(
+                            label: "This Week",
+                            count: creditManager.requestsThisWeek,
+                            modelRequests: creditManager.requestsThisWeekByModel,
+                            popoverTitle: "Requests This Week by Model"
+                        )
                     }
                 } else if let error = creditManager.errorMessage {
                     VStack(spacing: 4) {

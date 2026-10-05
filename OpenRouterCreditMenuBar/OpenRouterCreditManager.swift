@@ -17,15 +17,26 @@ struct ModelSpending: Identifiable {
     }
 }
 
+struct ModelRequests: Identifiable {
+    let id = UUID()
+    let modelName: String
+    let providerName: String
+    let count: Int
+    
+    var providerColor: Color {
+        ProviderColors.color(for: providerName)
+    }
+}
+
 struct ProviderColors {
     static func color(for provider: String) -> Color {
         let lowercased = provider.lowercased()
         if lowercased.contains("anthropic") || lowercased.contains("claude") {
             return Color(red: 0.85, green: 0.45, blue: 0.15)  // Claude orange/brown
         } else if lowercased.contains("openai") {
-            return Color(red: 0.0, green: 0.6, blue: 0.2)  // OpenAI green
+            return Color(red: 0.97, green: 0.97, blue: 0.97)  // OpenAI white #f7f7f7
         } else if lowercased.contains("google") || lowercased.contains("gemini") {
-            return Color(red: 0.25, green: 0.52, blue: 0.96)  // Google blue
+            return Color(red: 0.34, green: 0.57, blue: 0.93)  // Google blue #5792ed
         } else if lowercased.contains("meta") || lowercased.contains("llama") {
             return Color(red: 0.0, green: 0.5, blue: 0.85)  // Meta blue
         } else if lowercased.contains("mistral") {
@@ -35,13 +46,17 @@ struct ProviderColors {
         } else if lowercased.contains("perplexity") {
             return Color(red: 0.15, green: 0.65, blue: 0.85)  // Perplexity teal
         } else if lowercased.contains("qwen") || lowercased.contains("alibaba") {
-            return Color(red: 0.95, green: 0.45, blue: 0.1)  // Qwen orange
+            return Color(red: 0.47, green: 0.33, blue: 0.89)  // Qwen purple #7854e4
         } else if lowercased.contains("deepseek") {
-            return Color(red: 0.15, green: 0.7, blue: 0.4)  // DeepSeek green
+            return Color(red: 0.29, green: 0.41, blue: 0.96)  // DeepSeek blue-purple #4a68f6
+        } else if lowercased.contains("z.ai") || lowercased.contains("z-ai") || lowercased.contains("glm") {
+            return Color(red: 0.17, green: 0.17, blue: 0.17)  // z-ai dark gray #2c2c2c
+        } else if lowercased.contains("poolside") {
+            return Color(red: 0.25, green: 0.21, blue: 0.97)  // Poolside blue-purple #3f35f7
         } else if lowercased.contains("x.ai") || lowercased.contains("grok") {
             return Color(red: 0.0, green: 0.0, blue: 0.0)  // x.ai black
         } else if lowercased.contains("nvidia") {
-            return Color(red: 0.12, green: 0.65, blue: 0.25)  // NVIDIA green
+            return Color(red: 0.45, green: 0.70, blue: 0.01)  // NVIDIA green #74b303
         } else {
             return Color.secondary  // Default gray
         }
@@ -55,6 +70,11 @@ class OpenRouterCreditManager: ObservableObject {
     /// The UTC day that `spentToday` refers to (start of the current UTC day).
     @Published var spentTodayDate: Date?
     @Published var spentTodayByModel: [ModelSpending] = []
+    @Published var requestsToday: Int?
+    @Published var requestsTodayDate: Date?
+    @Published var requestsTodayByModel: [ModelRequests] = []
+    @Published var requestsThisWeek: Int?
+    @Published var requestsThisWeekByModel: [ModelRequests] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -130,12 +150,21 @@ class OpenRouterCreditManager: ObservableObject {
             let creditData = try await fetchCreditFromAPI()
             let spentToday = try await fetchSpentTodayFromAPI()
             let spentTodayByModel = try await fetchSpentTodayByModelFromAPI()
+            let requestsToday = try await fetchRequestsTodayFromAPI()
+            let requestsTodayByModel = try await fetchRequestsTodayByModelFromAPI()
+            let requestsThisWeek = try await fetchWeekRequestsFromAPI()
+            let requestsThisWeekByModel = try await fetchWeekRequestsByModelFromAPI()
             await MainActor.run {
                 self.currentCredit = creditData.total_credits - creditData.total_usage
                 self.totalUsage = creditData.total_usage
                 self.spentToday = spentToday.amount
                 self.spentTodayDate = spentToday.date
                 self.spentTodayByModel = spentTodayByModel
+                self.requestsToday = requestsToday.count
+                self.requestsTodayDate = requestsToday.date
+                self.requestsTodayByModel = requestsTodayByModel
+                self.requestsThisWeek = requestsThisWeek
+                self.requestsThisWeekByModel = requestsThisWeekByModel
                 self.isLoading = false
             }
         } catch {
@@ -157,11 +186,18 @@ class OpenRouterCreditManager: ObservableObject {
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-            httpResponse.statusCode == 200
-        else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        // Log the response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Credits response (\(httpResponse.statusCode)): \(responseString)")
+        }
+        
+        guard httpResponse.statusCode == 200 else {
             throw OpenRouterAPIError(
-                statusCode: (response as? HTTPURLResponse)?.statusCode ?? -1,
+                statusCode: httpResponse.statusCode,
                 serverMessage: Self.decodeServerErrorMessage(from: data)
             )
         }
@@ -173,8 +209,12 @@ class OpenRouterCreditManager: ObservableObject {
     // MARK: - Spend Today
 
     /// Metric name for total credits spent (USD) in /analytics/query responses.
-    /// Per the docs: spend metrics (`total_usage`, `usage_*`) are in USD.
+    /// Based on OpenRouter API: could be "cost", "total_usage", "spend", or "usage"
     private static let spentUsageMetric = "total_usage"
+    
+    /// Metric name for total requests count in /analytics/query responses.
+    /// Per OpenRouter analytics API: "request_count"
+    private static let requestsMetric = "request_count"
 
     /// Fetches the live "spent today" total (USD) via POST /analytics/query,
     /// querying the range UTC today 00:00:00 → now.
@@ -193,9 +233,7 @@ class OpenRouterCreditManager: ObservableObject {
             time_range: .init(
                 start: Self.iso8601SecondsString(for: startOfTodayUTC),
                 end: Self.iso8601SecondsString(for: Date())
-            ),
-            dimensions: nil,
-            granularity: nil
+            )
         )
 
         guard let url = URL(string: "https://openrouter.ai/api/v1/analytics/query") else {
@@ -208,13 +246,26 @@ class OpenRouterCreditManager: ObservableObject {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(body)
 
+        // Log the request body for debugging
+        if let httpBody = request.httpBody,
+           let requestString = String(data: httpBody, encoding: .utf8) {
+            print("[OpenRouter] Analytics query request: \(requestString)")
+        }
+
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-            httpResponse.statusCode == 200
-        else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        // Log the response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Analytics query response (\(httpResponse.statusCode)): \(responseString)")
+        }
+        
+        guard httpResponse.statusCode == 200 else {
             throw OpenRouterAPIError(
-                statusCode: (response as? HTTPURLResponse)?.statusCode ?? -1,
+                statusCode: httpResponse.statusCode,
                 serverMessage: Self.decodeServerErrorMessage(from: data)
             )
         }
@@ -278,11 +329,18 @@ class OpenRouterCreditManager: ObservableObject {
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-            httpResponse.statusCode == 200
-        else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        // Log the response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Analytics query response (\(httpResponse.statusCode)): \(responseString)")
+        }
+        
+        guard httpResponse.statusCode == 200 else {
             throw OpenRouterAPIError(
-                statusCode: (response as? HTTPURLResponse)?.statusCode ?? -1,
+                statusCode: httpResponse.statusCode,
                 serverMessage: Self.decodeServerErrorMessage(from: data)
             )
         }
@@ -310,6 +368,248 @@ class OpenRouterCreditManager: ObservableObject {
         // Sort by amount descending (free models with $0 will be at the bottom)
         return modelSpending.sorted { $0.amount > $1.amount }
     }
+    
+    // MARK: - Requests Today
+    
+    /// Fetches the live "requests today" total count via POST /analytics/query,
+    /// querying the range UTC today 00:00:00 → now.
+    private func fetchRequestsTodayFromAPI() async throws -> (count: Int, date: Date) {
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let startOfTodayUTC = utcCalendar.startOfDay(for: Date())
+        
+        let body = AnalyticsQueryRequest(
+            metrics: [Self.requestsMetric],
+            time_range: .init(
+                start: Self.iso8601SecondsString(for: startOfTodayUTC),
+                end: Self.iso8601SecondsString(for: Date())
+            )
+        )
+        
+        guard let url = URL(string: "https://openrouter.ai/api/v1/analytics/query") else {
+            throw URLError(.badURL)
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        // Log the response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Analytics query response (\(httpResponse.statusCode)): \(responseString)")
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+        
+        let result = try JSONDecoder().decode(AnalyticsQueryResponse.self, from: data)
+        // Response rows are flat objects with dimension values and metric values as properties.
+        var count = 0
+        for row in result.data.data {
+            count += Int(row.value(forKey: Self.requestsMetric)?.numberValue ?? 0)
+        }
+        // If the metric key is missing entirely, the name is probably wrong —
+        // surface the actual row keys so the correct one can be identified.
+        if let firstRow = result.data.data.first,
+           firstRow.value(forKey: Self.requestsMetric) == nil {
+            throw OpenRouterAPIError(
+                statusCode: 200,
+                serverMessage: "No '\(Self.requestsMetric)' metric in response. Row keys: \(firstRow.rawValues.keys.sorted().joined(separator: ", "))"
+            )
+        }
+        return (count, startOfTodayUTC)
+    }
+    
+    /// Fetches the live "requests today" breakdown by model via POST /analytics/query,
+    /// querying the range UTC today 00:00:00 → now, grouped by model.
+    private func fetchRequestsTodayByModelFromAPI() async throws -> [ModelRequests] {
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let startOfTodayUTC = utcCalendar.startOfDay(for: Date())
+        
+        let body = AnalyticsQueryRequest(
+            metrics: [Self.requestsMetric],
+            time_range: .init(
+                start: Self.iso8601SecondsString(for: startOfTodayUTC),
+                end: Self.iso8601SecondsString(for: Date())
+            ),
+            dimensions: ["model"],
+            granularity: nil
+        )
+        
+        guard let url = URL(string: "https://openrouter.ai/api/v1/analytics/query") else {
+            throw URLError(.badURL)
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        // Log the response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Analytics query response (\(httpResponse.statusCode)): \(responseString)")
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+        
+        let result = try JSONDecoder().decode(AnalyticsQueryResponse.self, from: data)
+        
+        var modelRequests: [ModelRequests] = []
+        for row in result.data.data {
+            // Extract model name from the row (dimension value)
+            let modelName = row.value(forKey: "model")?.stringValue ?? "Unknown"
+            
+            // Extract request count (metric value)
+            let count = Int(row.value(forKey: Self.requestsMetric)?.numberValue ?? 0)
+            
+            // Extract provider name from model (e.g., "anthropic/claude-3.5-sonnet" -> "anthropic")
+            let providerName = modelName.components(separatedBy: "/").first?.lowercased() ?? "unknown"
+            
+            modelRequests.append(ModelRequests(
+                modelName: modelName,
+                providerName: providerName,
+                count: count
+            ))
+        }
+        
+        // Sort by count descending
+        return modelRequests.sorted { $0.count > $1.count }
+    }
+
+    /// Fetches the requests count for the last 7×24 hours (168 hours) via POST /analytics/query.
+    private func fetchWeekRequestsFromAPI() async throws -> Int {
+        // Last 7 × 24 hours = 168 hours ago from now
+        let now = Date()
+        let startDate = now.addingTimeInterval(-7 * 24 * 60 * 60) // 168 hours ago
+
+        let body = AnalyticsQueryRequest(
+            metrics: [Self.requestsMetric],
+            time_range: .init(
+                start: Self.iso8601SecondsString(for: startDate),
+                end: Self.iso8601SecondsString(for: now)
+            )
+        )
+
+        guard let url = URL(string: "https://openrouter.ai/api/v1/analytics/query") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        // Log the response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Total requests query response (\(httpResponse.statusCode)): \(responseString)")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+
+        let result = try JSONDecoder().decode(AnalyticsQueryResponse.self, from: data)
+        var count = 0
+        for row in result.data.data {
+            count += Int(row.value(forKey: Self.requestsMetric)?.numberValue ?? 0)
+        }
+        return count
+    }
+
+    /// Fetches the requests count breakdown by model for the last 7×24 hours via POST /analytics/query.
+    private func fetchWeekRequestsByModelFromAPI() async throws -> [ModelRequests] {
+        let now = Date()
+        let startDate = now.addingTimeInterval(-7 * 24 * 60 * 60) // 168 hours ago
+
+        let body = AnalyticsQueryRequest(
+            metrics: [Self.requestsMetric],
+            time_range: .init(
+                start: Self.iso8601SecondsString(for: startDate),
+                end: Self.iso8601SecondsString(for: now)
+            ),
+            dimensions: ["model"]
+        )
+
+        guard let url = URL(string: "https://openrouter.ai/api/v1/analytics/query") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        // Log the response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Week requests by model response (\(httpResponse.statusCode)): \(responseString)")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+
+        let result = try JSONDecoder().decode(AnalyticsQueryResponse.self, from: data)
+
+        var modelRequests: [ModelRequests] = []
+        for row in result.data.data {
+            let modelName = row.value(forKey: "model")?.stringValue ?? "Unknown"
+            let count = Int(row.value(forKey: Self.requestsMetric)?.numberValue ?? 0)
+            let providerName = modelName.components(separatedBy: "/").first?.lowercased() ?? "unknown"
+
+            modelRequests.append(ModelRequests(
+                modelName: modelName,
+                providerName: providerName,
+                count: count
+            ))
+        }
+
+        return modelRequests.sorted { $0.count > $1.count }
+    }
 
     /// Extracts `error.message` from an OpenRouter error body, if present.
     private static func decodeServerErrorMessage(from data: Data) -> String? {
@@ -335,13 +635,20 @@ struct CreditData: Codable {
 struct AnalyticsQueryRequest: Codable {
     let metrics: [String]
     let time_range: TimeRange
-    let dimensions: [String]?
+    let dimensions: [String]
     let granularity: String?
 
     struct TimeRange: Codable {
         /// ISO 8601 UTC with seconds (YYYY-MM-DDTHH:mm:ss'Z')
         let start: String
         let end: String
+    }
+    
+    init(metrics: [String], time_range: TimeRange, dimensions: [String] = [], granularity: String? = nil) {
+        self.metrics = metrics
+        self.time_range = time_range
+        self.dimensions = dimensions
+        self.granularity = granularity
     }
 }
 
