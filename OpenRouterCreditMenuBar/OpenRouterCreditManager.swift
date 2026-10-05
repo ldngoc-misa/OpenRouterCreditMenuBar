@@ -75,6 +75,11 @@ class OpenRouterCreditManager: ObservableObject {
     @Published var requestsTodayByModel: [ModelRequests] = []
     @Published var requestsThisWeek: Int?
     @Published var requestsThisWeekByModel: [ModelRequests] = []
+    @Published var tokensToday: Int?
+    @Published var tokensTodayDate: Date?
+    @Published var tokensTodayByModel: [ModelRequests] = []
+    @Published var tokensThisWeek: Int?
+    @Published var tokensThisWeekByModel: [ModelRequests] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -154,6 +159,10 @@ class OpenRouterCreditManager: ObservableObject {
             let requestsTodayByModel = try await fetchRequestsTodayByModelFromAPI()
             let requestsThisWeek = try await fetchWeekRequestsFromAPI()
             let requestsThisWeekByModel = try await fetchWeekRequestsByModelFromAPI()
+            let tokensToday = try await fetchTokensTodayFromAPI()
+            let tokensTodayByModel = try await fetchTokensTodayByModelFromAPI()
+            let tokensThisWeek = try await fetchWeekTokensFromAPI()
+            let tokensThisWeekByModel = try await fetchWeekTokensByModelFromAPI()
             await MainActor.run {
                 self.currentCredit = creditData.total_credits - creditData.total_usage
                 self.totalUsage = creditData.total_usage
@@ -165,6 +174,11 @@ class OpenRouterCreditManager: ObservableObject {
                 self.requestsTodayByModel = requestsTodayByModel
                 self.requestsThisWeek = requestsThisWeek
                 self.requestsThisWeekByModel = requestsThisWeekByModel
+                self.tokensToday = tokensToday.count
+                self.tokensTodayDate = tokensToday.date
+                self.tokensTodayByModel = tokensTodayByModel
+                self.tokensThisWeek = tokensThisWeek
+                self.tokensThisWeekByModel = tokensThisWeekByModel
                 self.isLoading = false
             }
         } catch {
@@ -215,6 +229,11 @@ class OpenRouterCreditManager: ObservableObject {
     /// Metric name for total requests count in /analytics/query responses.
     /// Per OpenRouter analytics API: "request_count"
     private static let requestsMetric = "request_count"
+    
+    /// Metric name for total tokens in /analytics/query responses.
+    /// Per OpenRouter analytics API: "tokens_prompt" and "tokens_completion"
+    private static let promptTokensMetric = "tokens_prompt"
+    private static let completionTokensMetric = "tokens_completion"
 
     /// Fetches the live "spent today" total (USD) via POST /analytics/query,
     /// querying the range UTC today 00:00:00 → now.
@@ -246,13 +265,17 @@ class OpenRouterCreditManager: ObservableObject {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(body)
 
+        print("[OpenRouter] DEBUG: Request encoded successfully, about to send")
         // Log the request body for debugging
         if let httpBody = request.httpBody,
            let requestString = String(data: httpBody, encoding: .utf8) {
             print("[OpenRouter] Analytics query request: \(requestString)")
         }
+        print("[OpenRouter] DEBUG: Request logged, sending...")
 
         let (data, response) = try await URLSession.shared.data(for: request)
+
+        print("[OpenRouter] DEBUG: Response received")
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
@@ -262,8 +285,12 @@ class OpenRouterCreditManager: ObservableObject {
         if let responseString = String(data: data, encoding: .utf8) {
             print("[OpenRouter] Analytics query response (\(httpResponse.statusCode)): \(responseString)")
         }
-        
+
         guard httpResponse.statusCode == 200 else {
+            // Log detailed error for 400 and other errors
+            if let errorString = String(data: data, encoding: .utf8) {
+                print("[OpenRouter] ERROR \(httpResponse.statusCode): \(errorString)")
+            }
             throw OpenRouterAPIError(
                 statusCode: httpResponse.statusCode,
                 serverMessage: Self.decodeServerErrorMessage(from: data)
@@ -326,6 +353,12 @@ class OpenRouterCreditManager: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(body)
+
+        // Log the request body for debugging
+        if let httpBody = request.httpBody,
+           let requestString = String(data: httpBody, encoding: .utf8) {
+            print("[OpenRouter] Analytics query request: \(requestString)")
+        }
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -525,6 +558,12 @@ class OpenRouterCreditManager: ObservableObject {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(body)
 
+        // Log the request body for debugging
+        if let httpBody = request.httpBody,
+           let requestString = String(data: httpBody, encoding: .utf8) {
+            print("[OpenRouter] Analytics query request: \(requestString)")
+        }
+
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -575,6 +614,12 @@ class OpenRouterCreditManager: ObservableObject {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(body)
 
+        // Log the request body for debugging
+        if let httpBody = request.httpBody,
+           let requestString = String(data: httpBody, encoding: .utf8) {
+            print("[OpenRouter] Analytics query request: \(requestString)")
+        }
+
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -599,6 +644,264 @@ class OpenRouterCreditManager: ObservableObject {
         for row in result.data.data {
             let modelName = row.value(forKey: "model")?.stringValue ?? "Unknown"
             let count = Int(row.value(forKey: Self.requestsMetric)?.numberValue ?? 0)
+            let providerName = modelName.components(separatedBy: "/").first?.lowercased() ?? "unknown"
+
+            modelRequests.append(ModelRequests(
+                modelName: modelName,
+                providerName: providerName,
+                count: count
+            ))
+        }
+
+        return modelRequests.sorted { $0.count > $1.count }
+    }
+
+    // MARK: - Tokens Today
+
+    /// Fetches the live "tokens today" total count via POST /analytics/query,
+    /// querying the range UTC today 00:00:00 → now.
+    private func fetchTokensTodayFromAPI() async throws -> (count: Int, date: Date) {
+        print("[OpenRouter] fetchTokensTodayFromAPI called")
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let startOfTodayUTC = utcCalendar.startOfDay(for: Date())
+
+        let body = AnalyticsQueryRequest(
+            metrics: [Self.promptTokensMetric, Self.completionTokensMetric],
+            time_range: .init(
+                start: Self.iso8601SecondsString(for: startOfTodayUTC),
+                end: Self.iso8601SecondsString(for: Date())
+            )
+        )
+
+        guard let url = URL(string: "https://openrouter.ai/api/v1/analytics/query") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(body)
+
+        print("[OpenRouter] DEBUG: Request encoded successfully, about to send")
+        // Log the request body for debugging
+        if let httpBody = request.httpBody,
+           let requestString = String(data: httpBody, encoding: .utf8) {
+            print("[OpenRouter] Analytics query request: \(requestString)")
+        }
+        print("[OpenRouter] DEBUG: Request logged, sending...")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        print("[OpenRouter] DEBUG: Response received")
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        // Log the response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Analytics query response (\(httpResponse.statusCode)): \(responseString)")
+        }
+
+        // Log detailed error for non-200 responses
+        if httpResponse.statusCode != 200 {
+            if let errorString = String(data: data, encoding: .utf8) {
+                print("[OpenRouter] ERROR \(httpResponse.statusCode): \(errorString)")
+            }
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+
+        let result = try JSONDecoder().decode(AnalyticsQueryResponse.self, from: data)
+        var count = 0
+        for row in result.data.data {
+            count += Int(row.value(forKey: Self.promptTokensMetric)?.numberValue ?? 0)
+            count += Int(row.value(forKey: Self.completionTokensMetric)?.numberValue ?? 0)
+        }
+        return (count, startOfTodayUTC)
+    }
+
+    /// Fetches the live "tokens today" breakdown by model via POST /analytics/query,
+    /// querying the range UTC today 00:00:00 → now, grouped by model.
+    private func fetchTokensTodayByModelFromAPI() async throws -> [ModelRequests] {
+        print("[OpenRouter] fetchTokensTodayByModelFromAPI called")
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let startOfTodayUTC = utcCalendar.startOfDay(for: Date())
+
+        let body = AnalyticsQueryRequest(
+            metrics: [Self.promptTokensMetric, Self.completionTokensMetric],
+            time_range: .init(
+                start: Self.iso8601SecondsString(for: startOfTodayUTC),
+                end: Self.iso8601SecondsString(for: Date())
+            ),
+            dimensions: ["model"],
+            granularity: nil
+        )
+
+        guard let url = URL(string: "https://openrouter.ai/api/v1/analytics/query") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        // Log the response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Analytics query response (\(httpResponse.statusCode)): \(responseString)")
+        }
+
+        if httpResponse.statusCode != 200 {
+            if let errorString = String(data: data, encoding: .utf8) {
+                print("[OpenRouter] ERROR \(httpResponse.statusCode): \(errorString)")
+            }
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+
+        let result = try JSONDecoder().decode(AnalyticsQueryResponse.self, from: data)
+
+        var modelRequests: [ModelRequests] = []
+        for row in result.data.data {
+            let modelName = row.value(forKey: "model")?.stringValue ?? "Unknown"
+            let promptCount = Int(row.value(forKey: Self.promptTokensMetric)?.numberValue ?? 0)
+            let completionCount = Int(row.value(forKey: Self.completionTokensMetric)?.numberValue ?? 0)
+            let count = promptCount + completionCount
+            let providerName = modelName.components(separatedBy: "/").first?.lowercased() ?? "unknown"
+
+            modelRequests.append(ModelRequests(
+                modelName: modelName,
+                providerName: providerName,
+                count: count
+            ))
+        }
+
+        return modelRequests.sorted { $0.count > $1.count }
+    }
+
+    /// Fetches the tokens count for the last 7×24 hours (168 hours) via POST /analytics/query.
+    private func fetchWeekTokensFromAPI() async throws -> Int {
+        print("[OpenRouter] fetchWeekTokensFromAPI called")
+        let now = Date()
+        let startDate = now.addingTimeInterval(-7 * 24 * 60 * 60) // 168 hours ago
+
+        let body = AnalyticsQueryRequest(
+            metrics: [Self.promptTokensMetric, Self.completionTokensMetric],
+            time_range: .init(
+                start: Self.iso8601SecondsString(for: startDate),
+                end: Self.iso8601SecondsString(for: now)
+            )
+        )
+
+        guard let url = URL(string: "https://openrouter.ai/api/v1/analytics/query") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        // Log the response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Total tokens query response (\(httpResponse.statusCode)): \(responseString)")
+        }
+
+        if httpResponse.statusCode != 200 {
+            if let errorString = String(data: data, encoding: .utf8) {
+                print("[OpenRouter] ERROR \(httpResponse.statusCode): \(errorString)")
+            }
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+
+        let result = try JSONDecoder().decode(AnalyticsQueryResponse.self, from: data)
+        var count = 0
+        for row in result.data.data {
+            count += Int(row.value(forKey: Self.promptTokensMetric)?.numberValue ?? 0)
+            count += Int(row.value(forKey: Self.completionTokensMetric)?.numberValue ?? 0)
+        }
+        return count
+    }
+
+    /// Fetches the tokens count breakdown by model for the last 7×24 hours via POST /analytics/query.
+    private func fetchWeekTokensByModelFromAPI() async throws -> [ModelRequests] {
+        print("[OpenRouter] fetchWeekTokensByModelFromAPI called")
+        let now = Date()
+        let startDate = now.addingTimeInterval(-7 * 24 * 60 * 60) // 168 hours ago
+
+        let body = AnalyticsQueryRequest(
+            metrics: [Self.promptTokensMetric, Self.completionTokensMetric],
+            time_range: .init(
+                start: Self.iso8601SecondsString(for: startDate),
+                end: Self.iso8601SecondsString(for: now)
+            ),
+            dimensions: ["model"]
+        )
+
+        guard let url = URL(string: "https://openrouter.ai/api/v1/analytics/query") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        // Log the response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Week tokens by model response (\(httpResponse.statusCode)): \(responseString)")
+        }
+
+        if httpResponse.statusCode != 200 {
+            if let errorString = String(data: data, encoding: .utf8) {
+                print("[OpenRouter] ERROR \(httpResponse.statusCode): \(errorString)")
+            }
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+
+        let result = try JSONDecoder().decode(AnalyticsQueryResponse.self, from: data)
+
+        var modelRequests: [ModelRequests] = []
+        for row in result.data.data {
+            let modelName = row.value(forKey: "model")?.stringValue ?? "Unknown"
+            let promptCount = Int(row.value(forKey: Self.promptTokensMetric)?.numberValue ?? 0)
+            let completionCount = Int(row.value(forKey: Self.completionTokensMetric)?.numberValue ?? 0)
+            let count = promptCount + completionCount
             let providerName = modelName.components(separatedBy: "/").first?.lowercased() ?? "unknown"
 
             modelRequests.append(ModelRequests(
