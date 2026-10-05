@@ -292,11 +292,8 @@ class OpenRouterCreditManager: ObservableObject {
             // Extract model name from the row (dimension value)
             let modelName = row.value(forKey: "model")?.stringValue ?? "Unknown"
             
-            // Extract spend amount (metric value)
+            // Extract spend amount (metric value) - include free models with $0 spend
             let amount = row.value(forKey: Self.spentUsageMetric)?.numberValue ?? 0
-            
-            // Skip models with zero spend
-            guard amount > 0 else { continue }
             
             // Extract provider name from model (e.g., "anthropic/claude-3.5-sonnet" -> "anthropic")
             let providerName = modelName.components(separatedBy: "/").first?.lowercased() ?? "unknown"
@@ -308,7 +305,7 @@ class OpenRouterCreditManager: ObservableObject {
             ))
         }
         
-        // Sort by amount descending
+        // Sort by amount descending (free models with $0 will be at the bottom)
         return modelSpending.sorted { $0.amount > $1.amount }
     }
 
