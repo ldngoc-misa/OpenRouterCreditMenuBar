@@ -52,9 +52,10 @@ struct SpendTodayPopover: View {
             } else {
                 ForEach(modelSpending.prefix(10)) { spending in
                     HStack(spacing: 8) {
-                        Circle()
+                        // Vertical pill/capsule shape - longer and narrower
+                        RoundedRectangle(cornerRadius: 2)
                             .fill(spending.providerColor)
-                            .frame(width: 8, height: 8)
+                            .frame(width: 4, height: 16)
                         Text(spending.modelName)
                             .font(.caption)
                             .lineLimit(1)

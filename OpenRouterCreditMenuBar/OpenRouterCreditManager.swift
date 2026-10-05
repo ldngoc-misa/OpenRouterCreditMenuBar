@@ -40,6 +40,8 @@ struct ProviderColors {
             return Color(red: 0.15, green: 0.7, blue: 0.4)  // DeepSeek green
         } else if lowercased.contains("x.ai") || lowercased.contains("grok") {
             return Color(red: 0.0, green: 0.0, blue: 0.0)  // x.ai black
+        } else if lowercased.contains("nvidia") {
+            return Color(red: 0.12, green: 0.65, blue: 0.25)  // NVIDIA green
         } else {
             return Color.secondary  // Default gray
         }
