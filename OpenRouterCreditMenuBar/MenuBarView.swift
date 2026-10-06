@@ -1,7 +1,5 @@
-//
 //  MenuBarView.swift
 //  OpenRouterCreditMenuBar
-//
 
 import SwiftUI
 
@@ -215,26 +213,6 @@ struct RequestsTodayPopover: View {
     }
 }
 
-// Toolbar button content for use inside SettingsLink (unused - keeping for reference)
-// struct ToolbarButtonContent: View {
-//     let systemName: String
-//     @State private var isHovering = false
-//     
-//     var body: some View {
-//         Image(systemName: systemName)
-//             .font(.system(size: 14, weight: .medium))
-//             .foregroundColor(.white)
-//             .frame(width: 28, height: 28)
-//             .background(
-//                 RoundedRectangle(cornerRadius: 6)
-//                     .fill(isHovering ? Color.white.opacity(0.2) : Color.clear)
-//             )
-//             .onHover { hovering in
-//                 isHovering = hovering
-//             }
-//     }
-// }
-
 // Toolbar button with hover effect for use inside SettingsLink
 struct SettingsToolbarButton: View {
     let systemName: String
@@ -257,7 +235,7 @@ struct SettingsToolbarButton: View {
 
 struct MenuBarView: View {
     @EnvironmentObject var creditManager: OpenRouterCreditManager
-
+    
     /// Label showing which day the "Spend" value refers to.
     /// Days are compared in UTC to stay consistent with the API's UTC-based data.
     private var spentTodayLabel: String {
@@ -288,10 +266,10 @@ struct MenuBarView: View {
         }
         return "Requests \(date.formatted(date: .abbreviated, time: .omitted))"
     }
-
+    
     var body: some View {
         VStack(spacing: 8) {
-            // MARK: - Title Bar with buttons
+            // MARK: - Line 1: Title Bar with buttons (KEEP AS IS)
             HStack(spacing: 6) {
                 Image(systemName: "creditcard")
                     .foregroundColor(.blue)
@@ -338,165 +316,16 @@ struct MenuBarView: View {
             
             // Separator after title bar
             Divider()
-
-            // MARK: - Middle Section: Left Content (3 blocks) + Right Content (TOP MODELS)
-            HStack(alignment: .top, spacing: 16) {
-                // Left Column: Credit, Requests, Tokens stacked
-                VStack(alignment: .leading, spacing: 8) {
-                    // MARK: - Credit Information
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("CREDIT")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .textCase(.uppercase)
-
-                        if creditManager.isLoading {
-                            HStack {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                Text("Loading...")
-                                    .font(.caption)
-                            }
-                        } else if let credit = creditManager.currentCredit {
-                            HStack(alignment: .top, spacing: 12) {
-                                SpendTodayAmountView(
-                                    label: spentTodayLabel,
-                                    amount: creditManager.spentToday,
-                                    modelSpending: creditManager.spentTodayByModel
-                                )
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Available")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text("$\(String(format: "%.4f", credit))")
-                                        .font(.title3)
-                                        .fontWeight(.semibold)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        } else if let error = creditManager.creditErrorMessage {
-                            VStack(spacing: 4) {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .foregroundColor(.orange)
-                                Text("Error")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text(error)
-                                    .font(.caption2)
-                                    .multilineTextAlignment(.center)
-                            }
-                        }
-                    }
-
-                    Divider()
-
-                    // MARK: - Requests Information
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("REQUESTS")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .textCase(.uppercase)
-
-                        if creditManager.isLoading {
-                            HStack {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                Text("Loading...")
-                                    .font(.caption)
-                            }
-                        } else if creditManager.requestsToday != nil {
-                            HStack(alignment: .top, spacing: 12) {
-                                RequestsTodayAmountView(
-                                    label: "Today",
-                                    count: creditManager.requestsToday,
-                                    modelRequests: creditManager.requestsTodayByModel,
-                                    popoverTitle: "Requests Today by Model"
-                                )
-
-                                RequestsTodayAmountView(
-                                    label: "This Week",
-                                    count: creditManager.requestsThisWeek,
-                                    modelRequests: creditManager.requestsThisWeekByModel,
-                                    popoverTitle: "Requests This Week by Model"
-                                )
-                            }
-                        } else if let error = creditManager.requestsErrorMessage {
-                            VStack(spacing: 4) {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .foregroundColor(.orange)
-                                Text("Error")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text(error)
-                                    .font(.caption2)
-                                    .multilineTextAlignment(.center)
-                            }
-                        }
-                    }
-
-                    Divider()
-
-                    // MARK: - Tokens Information
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("TOKENS")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .textCase(.uppercase)
-
-                        if creditManager.isLoading {
-                            HStack {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                Text("Loading...")
-                                    .font(.caption)
-                            }
-                        } else if creditManager.tokensToday != nil {
-                            HStack(alignment: .top, spacing: 12) {
-                                RequestsTodayAmountView(
-                                    label: "Today",
-                                    count: creditManager.tokensToday,
-                                    modelRequests: creditManager.tokensTodayByModel,
-                                    popoverTitle: "Tokens Today by Model"
-                                )
-
-                                RequestsTodayAmountView(
-                                    label: "This Week",
-                                    count: creditManager.tokensThisWeek,
-                                    modelRequests: creditManager.tokensThisWeekByModel,
-                                    popoverTitle: "Tokens This Week by Model"
-                                )
-                            }
-                        } else if let error = creditManager.tokensErrorMessage {
-                            VStack(spacing: 4) {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .foregroundColor(.orange)
-                                Text("Error")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text(error)
-                                    .font(.caption2)
-                                    .multilineTextAlignment(.center)
-                            }
-                        }
-                    }
-                }
-                .frame(width: 220)
-
-                // Vertical separator between left blocks and TOP MODELS
-                Divider()
-                    .frame(height: nil)
-
-                // Right Column: TOP MODELS - height matches the 3 left blocks
+            
+            // MARK: - Line 2: Credit | Requests | Tokens (3 equal horizontal sections)
+            HStack(spacing: 12) {
+                // CREDIT BLOCK
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("TOP MODELS")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .textCase(.uppercase)
-                        Spacer()
-                    }
-
+                    Text("CREDIT")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+                    
                     if creditManager.isLoading {
                         HStack {
                             ProgressView()
@@ -504,7 +333,25 @@ struct MenuBarView: View {
                             Text("Loading...")
                                 .font(.caption)
                         }
-                    } else if let error = creditManager.topModelsErrorMessage {
+                    } else if let credit = creditManager.currentCredit {
+                        HStack(alignment: .top, spacing: 12) {
+                            SpendTodayAmountView(
+                                label: spentTodayLabel,
+                                amount: creditManager.spentToday,
+                                modelSpending: creditManager.spentTodayByModel
+                            )
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Available")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("$\(String(format: "%.4f", credit))")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    } else if let error = creditManager.creditErrorMessage {
                         VStack(spacing: 4) {
                             Image(systemName: "exclamationmark.triangle")
                                 .foregroundColor(.orange)
@@ -515,8 +362,143 @@ struct MenuBarView: View {
                                 .font(.caption2)
                                 .multilineTextAlignment(.center)
                         }
-                    } else {
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // Vertical separator
+                Divider()
+                
+                // REQUESTS BLOCK
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("REQUESTS")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+                    
+                    if creditManager.isLoading {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading...")
+                                .font(.caption)
+                        }
+                    } else if creditManager.requestsToday != nil {
                         HStack(alignment: .top, spacing: 12) {
+                            RequestsTodayAmountView(
+                                label: "Today",
+                                count: creditManager.requestsToday,
+                                modelRequests: creditManager.requestsTodayByModel,
+                                popoverTitle: "Requests Today by Model"
+                            )
+                            
+                            RequestsTodayAmountView(
+                                label: "This Week",
+                                count: creditManager.requestsThisWeek,
+                                modelRequests: creditManager.requestsThisWeekByModel,
+                                popoverTitle: "Requests This Week by Model"
+                            )
+                        }
+                    } else if let error = creditManager.requestsErrorMessage {
+                        VStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.orange)
+                            Text("Error")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(error)
+                                .font(.caption2)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // Vertical separator
+                Divider()
+                
+                // TOKENS BLOCK
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("TOKENS")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+                    
+                    if creditManager.isLoading {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading...")
+                                .font(.caption)
+                        }
+                    } else if creditManager.tokensToday != nil {
+                        HStack(alignment: .top, spacing: 12) {
+                            RequestsTodayAmountView(
+                                label: "Today",
+                                count: creditManager.tokensToday,
+                                modelRequests: creditManager.tokensTodayByModel,
+                                popoverTitle: "Tokens Today by Model"
+                            )
+                            
+                            RequestsTodayAmountView(
+                                label: "This Week",
+                                count: creditManager.tokensThisWeek,
+                                modelRequests: creditManager.tokensThisWeekByModel,
+                                popoverTitle: "Tokens This Week by Model"
+                            )
+                        }
+                    } else if let error = creditManager.tokensErrorMessage {
+                        VStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.orange)
+                            Text("Error")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(error)
+                                .font(.caption2)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .top)
+            
+            // Separator before Top Models
+            Divider()
+            
+            // MARK: - Line 3: Top Models (Full Width)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("TOP MODELS")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+                    Spacer()
+                }
+                
+                if creditManager.isLoading {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading...")
+                            .font(.caption)
+                    }
+                } else if let error = creditManager.topModelsErrorMessage {
+                    VStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundColor(.orange)
+                        Text("Error")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(error)
+                            .font(.caption2)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 8)
+                } else {
+                    HStack(alignment: .top, spacing: 16) {
                         // Paid models column
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Paid")
@@ -548,7 +530,7 @@ struct MenuBarView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-
+                        
                         // Free models column
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Free")
@@ -581,12 +563,11 @@ struct MenuBarView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
-
-                    Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity, alignment: .top)
                 }
             }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
