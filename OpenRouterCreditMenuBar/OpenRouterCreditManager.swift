@@ -142,8 +142,8 @@ struct ModelsAPIPricingOverride: Decodable {
 }
 
 struct ModelsAPITopProvider: Decodable {
-    let context_length: Int
-    let max_completion_tokens: Int
+    let context_length: Int?
+    let max_completion_tokens: Int?
     let is_moderated: Bool
 }
 
@@ -154,7 +154,12 @@ struct ModelsAPIRateLimits: Decodable {
 }
 
 struct ModelsAPIDefaultParameters: Decodable {
-    // Flexible - can contain various default parameter values
+    let rawValues: [String: FlexibleJSONValue]
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.rawValues = try container.decode([String: FlexibleJSONValue].self)
+    }
 }
 
 struct ModelsAPIBenchmarks: Decodable {
@@ -1379,14 +1384,17 @@ class OpenRouterCreditManager: ObservableObject {
             modelTokens[entry.model_permaslug, default: 0] += tokens
         }
 
+        // Fetch model names from Models API to get proper display names
+        let nameLookup = try await fetchModelNameLookup()
+
         // Sort by total tokens descending and take top models
         let sortedModels = modelTokens
             .sorted { $0.value > $1.value }
             .map { (permaslug, totalTokens) in
                 // Determine if free: slug ends with :free
                 let isFree = permaslug.hasSuffix(":free")
-                // Create display name by removing provider prefix and :free suffix
-                let displayName = permaslug
+                // Get display name from Models API lookup, fallback to permaslug-derived name
+                let displayName = nameLookup[permaslug] ?? permaslug
                     .components(separatedBy: "/").last?
                     .replacingOccurrences(of: ":free", with: "") ?? permaslug
                 return TopModel(
@@ -1406,6 +1414,39 @@ class OpenRouterCreditManager: ObservableObject {
             free: Array(freeModels),
             date: endDate
         )
+    }
+
+    /// Fetches a lookup dictionary of model permaslug -> display name from Models API
+    private func fetchModelNameLookup() async throws -> [String: String] {
+        // Fetch a larger set of models to cover the permaslugs from Data API
+        let urlString = "https://openrouter.ai/api/v1/models?limit=200"
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            // If Models API fails, return empty lookup (will use fallback names)
+            return [:]
+        }
+
+        let modelsResponse = try JSONDecoder().decode(ModelsAPIResponse.self, from: data)
+
+        // Build lookup: map both id and canonical_slug to display name
+        // Data API uses model_permaslug which may match either id or canonical_slug
+        var lookup: [String: String] = [:]
+        for model in modelsResponse.data {
+            lookup[model.id] = model.name
+            lookup[model.canonical_slug] = model.name
+        }
+        print("[OpenRouter] Model name lookup built with \(lookup.count) entries")
+        return lookup
     }
 
     // MARK: - Top Models (Models API)
