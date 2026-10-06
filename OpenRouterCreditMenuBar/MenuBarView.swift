@@ -234,21 +234,43 @@ struct SettingsToolbarButton: View {
 // Scrollable model list row
 struct ModelListRow: View {
     let model: TopModel
-    
+
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
+            // Provider color indicator
             RoundedRectangle(cornerRadius: 2)
                 .fill(model.providerColor)
                 .frame(width: 3, height: 12)
+
+            // Model Name
             Text(model.displayName)
                 .font(.caption2)
                 .lineLimit(1)
                 .truncationMode(.middle)
-            Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
+
+            // Total Tokens
             Text(model.totalTokens > 0 ? model.formattedTokens : "N/A")
                 .font(.caption2)
                 .fontWeight(.medium)
                 .foregroundColor(.secondary)
+                .frame(width: 50, alignment: .trailing)
+
+            // Input Price / Output Price (only for paid models)
+            if !model.isFree, let pricing = model.formattedPricing {
+                Text(pricing)
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                    .frame(width: 80, alignment: .trailing)
+            }
+
+            // Context Length
+            Text(model.formattedContext)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .frame(width: 35, alignment: .trailing)
         }
         .padding(.vertical, 2)
     }
@@ -258,14 +280,14 @@ struct ModelListRow: View {
 struct ModelColumn: View {
     let title: String
     let models: [TopModel]
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption2)
                 .fontWeight(.semibold)
                 .foregroundColor(.secondary)
-            
+
             if models.isEmpty {
                 Text("No data")
                     .font(.caption2)
@@ -273,16 +295,66 @@ struct ModelColumn: View {
                     .italic()
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(models) { model in
-                            ModelListRow(model: model)
+                VStack(spacing: 0) {
+                    // Column headers
+                    ModelColumnHeader(isFree: models.first?.isFree ?? false)
+
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(models) { model in
+                                ModelListRow(model: model)
+                            }
                         }
                     }
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// Column header row
+struct ModelColumnHeader: View {
+    let isFree: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            // Empty space for color indicator
+            Color.clear
+                .frame(width: 3, height: 12)
+
+            // Model Name
+            Text("Model")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Tokens
+            Text("Tokens")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+                .frame(width: 50, alignment: .trailing)
+
+            // Price (only for paid)
+            if !isFree {
+                Text("Price")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .frame(width: 80, alignment: .trailing)
+            }
+
+            // Context
+            Text("Ctx")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+                .frame(width: 35, alignment: .trailing)
+        }
+        .padding(.vertical, 2)
+        .padding(.bottom, 2)
     }
 }
 

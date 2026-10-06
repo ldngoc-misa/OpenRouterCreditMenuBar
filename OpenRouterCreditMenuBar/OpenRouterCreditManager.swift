@@ -6,16 +6,91 @@
 import Foundation
 import SwiftUI
 
-/// Formats a number in abbreviated form (e.g., 1.5K, 2.3M, 1.2B)
+/// Formats a number in abbreviated form (e.g., 1.5K, 2.3M, 1.2B, 3.4T)
 func formatAbbreviated(_ number: Int) -> String {
     let value = Double(number)
     switch value {
+    case 1_000_000_000_000...:
+        return String(format: "%.1fT", value / 1_000_000_000_000)
     case 1_000_000_000...:
         return String(format: "%.1fB", value / 1_000_000_000)
     case 1_000_000...:
         return String(format: "%.1fM", value / 1_000_000)
     case 1_000...:
         return String(format: "%.1fK", value / 1_000)
+    default:
+        return "\(number)"
+    }
+}
+
+/// Format tokens with specific rules:
+/// - If integer part has >=3 digits: no decimals (e.g., 123K, 1.2M)
+/// - If integer part has <3 digits: show decimals so total digits = 3 (e.g., 1.23, 25.6)
+func formatTokens(_ number: Int) -> String {
+    let value = Double(number)
+    let abbreviated = formatAbbreviated(number)
+
+    // Extract the numeric part and suffix
+    let suffix: String
+    let numericPart: Double
+    if abbreviated.hasSuffix("T") {
+        suffix = "T"
+        numericPart = value / 1_000_000_000_000
+    } else if abbreviated.hasSuffix("B") {
+        suffix = "B"
+        numericPart = value / 1_000_000_000
+    } else if abbreviated.hasSuffix("M") {
+        suffix = "M"
+        numericPart = value / 1_000_000
+    } else if abbreviated.hasSuffix("K") {
+        suffix = "K"
+        numericPart = value / 1_000
+    } else {
+        // No suffix, just the number
+        return "\(number)"
+    }
+
+    let intPart = Int(numericPart)
+    let intDigits = "\(intPart)".count
+
+    if intDigits >= 3 {
+        // >=3 integer digits: no decimals
+        return "\(intPart)\(suffix)"
+    } else {
+        // <3 integer digits: show decimals so total digits = 3
+        let decimalPlaces = 3 - intDigits
+        let format = "%." + "\(decimalPlaces)" + "f\(suffix)"
+        return String(format: format, numericPart)
+    }
+}
+
+/// Format price: remove trailing zeros after decimal point
+func formatPrice(_ priceString: String) -> String {
+    guard let price = Double(priceString) else { return priceString }
+    let pricePerM = price * 1_000_000
+    // Format with up to 4 decimal places, then remove trailing zeros
+    let formatted = String(format: "%.4f", pricePerM)
+    // Remove trailing zeros and potential trailing decimal point
+    return formatted
+        .replacingOccurrences(of: "\\.?0+$", with: "", options: .regularExpression)
+}
+
+/// Format context length: no decimals, round to whole number
+func formatContext(_ number: Int) -> String {
+    let value = Double(number)
+    switch value {
+    case 1_000_000_000_000...:
+        let rounded = Int((value / 1_000_000_000_000).rounded())
+        return "\(rounded)T"
+    case 1_000_000_000...:
+        let rounded = Int((value / 1_000_000_000).rounded())
+        return "\(rounded)B"
+    case 1_000_000...:
+        let rounded = Int((value / 1_000_000).rounded())
+        return "\(rounded)M"
+    case 1_000...:
+        let rounded = Int((value / 1_000).rounded())
+        return "\(rounded)K"
     default:
         return "\(number)"
     }
@@ -50,6 +125,9 @@ struct TopModel: Identifiable {
     let displayName: String
     let totalTokens: Int
     let isFree: Bool
+    let inputPrice: String?      // Price per 1M tokens (e.g., "0.000000003")
+    let outputPrice: String?     // Price per 1M tokens (e.g., "0.0000024")
+    let contextLength: Int       // Context length in tokens (e.g., 1048576)
 
     var providerName: String {
         modelPermaslug.components(separatedBy: "/").first?.lowercased() ?? "unknown"
@@ -60,7 +138,20 @@ struct TopModel: Identifiable {
     }
 
     var formattedTokens: String {
-        formatAbbreviated(totalTokens)
+        formatTokens(totalTokens)
+    }
+
+    /// Formatted pricing string for paid models (e.g., "$0.0395/$1.2")
+    var formattedPricing: String? {
+        guard !isFree, let input = inputPrice, let output = outputPrice else { return nil }
+        let inputFormatted = formatPrice(input)
+        let outputFormatted = formatPrice(output)
+        return "$\(inputFormatted)/$\(outputFormatted)"
+    }
+
+    /// Formatted context length (e.g., "1M", "128K") - no decimals
+    var formattedContext: String {
+        formatContext(contextLength)
     }
 }
 
@@ -1336,11 +1427,18 @@ class OpenRouterCreditManager: ObservableObject {
                     print("[OpenRouter] No analytics match for \(isFree ? "free" : "paid") model: \(permaslug), tried keys: \(possibleKeys)")
                 }
 
+                // Extract pricing and context from endpoint
+                let inputPrice = model.endpoint?.pricing?.prompt
+                let outputPrice = model.endpoint?.pricing?.completion
+
                 return TopModel(
                     modelPermaslug: permaslug,
                     displayName: model.short_name ?? model.name,
                     totalTokens: totalTokens,
-                    isFree: isFree
+                    isFree: isFree,
+                    inputPrice: inputPrice,
+                    outputPrice: outputPrice,
+                    contextLength: model.context_length
                 )
             }
 
@@ -1387,7 +1485,7 @@ class OpenRouterCreditManager: ObservableObject {
                 // Debug: log available analytics keys
                 print("[OpenRouter] Available analytics keys (free): \(Array(analyticsLookup.keys).prefix(20))")
             }
-        
+
         // Debug: log model permaslugs and variant permaslugs
         for model in publicResponse.data.models.prefix(10) {
             print("[OpenRouter] Model: permaslug=\(model.permaslug ?? "nil"), slug=\(model.slug), variant_permaslug=\(model.endpoint?.model_variant_permaslug ?? "nil"), variant=\(model.endpoint?.variant ?? "nil"), is_free=\(model.endpoint?.is_free ?? false)")
@@ -1406,7 +1504,7 @@ class OpenRouterCreditManager: ObservableObject {
                     model.endpoint?.model_variant_permaslug ?? "",
                     model.endpoint?.model_variant_slug ?? ""
                 ].filter { !$0.isEmpty }
-                
+
                 var totalTokens = 0
                 for key in possibleKeys {
                     if let tokens = analyticsLookup[key]?.totalTokens {
@@ -1414,16 +1512,23 @@ class OpenRouterCreditManager: ObservableObject {
                         break
                     }
                 }
-                
+
                 if totalTokens == 0 {
                     print("[OpenRouter] No analytics match for free model: \(permaslug), tried keys: \(possibleKeys)")
                 }
-                
+
+                // Extract pricing and context from endpoint (free models have pricing of "0")
+                let inputPrice = model.endpoint?.pricing?.prompt
+                let outputPrice = model.endpoint?.pricing?.completion
+
                 return TopModel(
                     modelPermaslug: permaslug,
                     displayName: model.short_name ?? model.name,
                     totalTokens: totalTokens,
-                    isFree: true
+                    isFree: true,
+                    inputPrice: inputPrice,
+                    outputPrice: outputPrice,
+                    contextLength: model.context_length
                 )
             }
 
