@@ -614,27 +614,32 @@ struct MenuBarView: View {
             
             // Separator after title bar
             Divider()
-            
+                .padding(.bottom, 15)
+
             // MARK: - Line 2: Credit | Requests | Tokens - FIXED HEIGHT (300px for 15 items)
-            HStack(spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
                 MetricBlock(
                     title: "CREDIT",
                     isLoading: creditManager.isLoading,
                     errorMessage: creditManager.creditErrorMessage,
                     content: AnyView(creditContent)
                 )
-                
+
                 Divider()
-                
+                    .frame(height: 56)
+                    .frame(maxHeight: .infinity, alignment: .top)
+
                 MetricBlock(
                     title: "REQUESTS",
                     isLoading: creditManager.isLoading,
                     errorMessage: creditManager.requestsErrorMessage,
                     content: AnyView(requestsContent)
                 )
-                
+
                 Divider()
-                
+                    .frame(height: 56)
+                    .frame(maxHeight: .infinity, alignment: .top)
+
                 MetricBlock(
                     title: "TOKENS",
                     isLoading: creditManager.isLoading,
@@ -646,7 +651,8 @@ struct MenuBarView: View {
             
             // Separator before Top Models
             Divider()
-            
+                .padding(.bottom, 15)
+
             // MARK: - Line 3: Top Models (Full Width) - FIXED HEIGHT (300px with scroll)
             TopModelsBlock(
                 isLoading: creditManager.isLoading,
