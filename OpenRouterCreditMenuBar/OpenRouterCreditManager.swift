@@ -64,116 +64,6 @@ struct TopModel: Identifiable {
     }
 }
 
-/// Response from rankings-daily endpoint
-struct TopModelsResponse: Decodable {
-    let data: [TopModelDailyEntry]
-    let meta: TopModelsMeta
-}
-
-struct TopModelDailyEntry: Decodable {
-    let date: String
-    let model_permaslug: String
-    let total_tokens: String
-}
-
-struct TopModelsMeta: Decodable {
-    let as_of: String
-    let version: String
-    let start_date: String
-    let end_date: String
-}
-
-/// Models API response types
-struct ModelsAPIResponse: Decodable {
-    let data: [ModelsAPIModel]
-    let total_count: Int
-    let links: ModelsAPILinks?
-}
-
-struct ModelsAPILinks: Decodable {
-    let next: String?
-}
-
-struct ModelsAPIModel: Decodable {
-    let id: String
-    let canonical_slug: String
-    let name: String
-    let created: Int
-    let description: String
-    let context_length: Int
-    let architecture: ModelsAPIArchitecture?
-    let pricing: ModelsAPIPricing
-    let top_provider: ModelsAPITopProvider?
-    let per_request_limits: ModelsAPIRateLimits?
-    let supported_parameters: [String]
-    let default_parameters: ModelsAPIDefaultParameters?
-    let expiration_date: String?
-    let benchmarks: ModelsAPIBenchmarks?
-}
-
-struct ModelsAPIArchitecture: Decodable {
-    let input_modalities: [String]
-    let output_modalities: [String]
-    let tokenizer: String
-    let instruct_type: String?
-}
-
-struct ModelsAPIPricing: Decodable {
-    let prompt: String
-    let completion: String
-    let request: String?
-    let image: String?
-    let web_search: String?
-    let internal_reasoning: String?
-    let input_cache_read: String?
-    let input_cache_write: String?
-    let overrides: [ModelsAPIPricingOverride]?
-}
-
-struct ModelsAPIPricingOverride: Decodable {
-    let min_prompt_tokens: Int?
-    let utc_start: Int?
-    let utc_end: Int?
-    let utc_days: [String]?
-    let prompt: String?
-    let completion: String?
-    let input_cache_read: String?
-    let input_cache_write: String?
-}
-
-struct ModelsAPITopProvider: Decodable {
-    let context_length: Int?
-    let max_completion_tokens: Int?
-    let is_moderated: Bool
-}
-
-struct ModelsAPIRateLimits: Decodable {
-    let prompt_tokens: Int?
-    let completion_tokens: Int?
-    let requests: Int?
-}
-
-struct ModelsAPIDefaultParameters: Decodable {
-    let rawValues: [String: FlexibleJSONValue]
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        self.rawValues = try container.decode([String: FlexibleJSONValue].self)
-    }
-}
-
-struct ModelsAPIBenchmarks: Decodable {
-    let design_arena: [ModelsAPIDesignArena]?
-}
-
-struct ModelsAPIDesignArena: Decodable {
-    let arena: String
-    let category: String
-    let elo: Double
-    let win_rate: Double
-    let rank: Int
-}
-
 /// Public API (frontend) response types
 struct PublicAPIResponse: Decodable {
     let data: PublicAPIData
@@ -320,58 +210,81 @@ struct PublicAPIPricing: Decodable {
 struct ProviderColors {
     static func color(for provider: String) -> Color {
         let lowercased = provider.lowercased()
-        if lowercased.contains("anthropic") || lowercased.contains("claude") {
-            return Color(red: 0.85, green: 0.45, blue: 0.15)  // Claude orange/brown
-        } else if lowercased.contains("openai") {
-            return Color(red: 0.97, green: 0.97, blue: 0.97)  // OpenAI white #f7f7f7
+        if lowercased.contains("deepseek") {
+            return Color(hex: "4f6afd")  // DeepSeek
+        } else if lowercased.contains("z.ai") || lowercased.contains("z-ai") || lowercased.contains("glm") {
+            return Color(hex: "d2d2d2")  // Z.ai
+        } else if lowercased.contains("xiaomi") {
+            return Color(hex: "ec6617")  // Xiaomi
+        } else if lowercased.contains("tencent") {
+            return Color(hex: "43baff")  // Tencent
+        } else if lowercased.contains("nvidia") {
+            return Color(hex: "74b700")  // NVIDIA
+        } else if lowercased.contains("typesafe") {
+            return Color(hex: "e551ba")  // Typesafe
+        } else if lowercased.contains("anthropic") || lowercased.contains("claude") {
+            return Color(hex: "cc9b7a")  // Anthropic
         } else if lowercased.contains("google") || lowercased.contains("gemini") {
-            return Color(red: 0.34, green: 0.57, blue: 0.93)  // Google blue #5792ed
+            return Color(hex: "7276c9")  // Google
+        } else if lowercased.contains("moonshotai") || lowercased.contains("moonshot") {
+            return Color(hex: "c7c7c7")  // Moonshot AI
         } else if lowercased.contains("meta") || lowercased.contains("llama") {
-            return Color(red: 0.0, green: 0.5, blue: 0.85)  // Meta blue
+            return Color(hex: "3c87ec")  // Meta
+        } else if lowercased.contains("minimax") {
+            return Color(hex: "f44854")  // MiniMax
+        } else if lowercased.contains("poolside") {
+            return Color(hex: "4337ff")  // Poolside
+        } else if lowercased.contains("openrouter") {
+            return Color(hex: "c8fe03")  // OpenRouter
+        } else if lowercased.contains("upstage") {
+            return Color(hex: "8c8ddf")  // Upstage
+        } else if lowercased.contains("qwen") || lowercased.contains("alibaba") {
+            return Color(hex: "6c62f8")  // Qwen
+        } else if lowercased.contains("dots-studio") || lowercased.contains("dotsstudio") {
+            return Color(hex: "a4e7da")  // Dots Studio
+        } else if lowercased.contains("inclusionai") || lowercased.contains("inclusion") {
+            return Color(hex: "ffffff")  // InclusionAI
+        } else if lowercased.contains("x.ai") || lowercased.contains("grok") {
+            return Color(hex: "ffffff")  // x.ai
+        } else if lowercased.contains("openai") {
+            return Color(hex: "f7f7f7")  // OpenAI white
         } else if lowercased.contains("mistral") {
             return Color(red: 0.9, green: 0.3, blue: 0.25)  // Mistral red/orange
         } else if lowercased.contains("cohere") {
             return Color(red: 0.5, green: 0.2, blue: 0.8)  // Cohere purple
         } else if lowercased.contains("perplexity") {
             return Color(red: 0.15, green: 0.65, blue: 0.85)  // Perplexity teal
-        } else if lowercased.contains("qwen") || lowercased.contains("alibaba") {
-            return Color(red: 0.47, green: 0.33, blue: 0.89)  // Qwen purple #7854e4
-        } else if lowercased.contains("deepseek") {
-            return Color(red: 0.29, green: 0.41, blue: 0.96)  // DeepSeek blue-purple #4a68f6
-        } else if lowercased.contains("z.ai") || lowercased.contains("z-ai") || lowercased.contains("glm") {
-            return Color(red: 0.17, green: 0.17, blue: 0.17)  // z-ai dark gray #2c2c2c
-        } else if lowercased.contains("poolside") {
-            return Color(red: 0.25, green: 0.21, blue: 0.97)  // Poolside blue-purple #3f35f7
-        } else if lowercased.contains("x.ai") || lowercased.contains("grok") {
-            return Color(red: 0.0, green: 0.0, blue: 0.0)  // x.ai black
-        } else if lowercased.contains("nvidia") {
-            return Color(red: 0.45, green: 0.70, blue: 0.01)  // NVIDIA green #74b303
         } else {
             return Color.secondary  // Default gray
         }
     }
 }
 
-class OpenRouterCreditManager: ObservableObject {
-    /// Fetch mode for top models
-    enum TopModelsFetchMode: String, CaseIterable, Identifiable {
-        case dataAPI = "Data API"
-        case modelsAPI = "Models API"
-        case publicAPI = "Public API"
-        
-        var id: String { rawValue }
-        
-        var description: String {
-            switch self {
-            case .dataAPI:
-                return "7-day token aggregation from actual usage (most accurate)"
-            case .modelsAPI:
-                return "Weekly popularity ranking from Models API (no token data)"
-            case .publicAPI:
-                return "Frontend rankings from OpenRouter website (no auth required)"
-            }
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let r, g, b: UInt64
+        switch hex.count {
+        case 6: // RGB (24-bit)
+            (r, g, b) = ((int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (r, g, b) = ((int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
+        default:
+            (r, g, b) = (128, 128, 128)
         }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: 1
+        )
     }
+}
+
+class OpenRouterCreditManager: ObservableObject {
     @Published var currentCredit: Double?
     @Published var totalUsage: Double?
     @Published var spentToday: Double?
@@ -436,16 +349,6 @@ class OpenRouterCreditManager: ObservableObject {
         set {
             userDefaults.set(newValue, forKey: "refresh_interval")
             setupTimer()
-        }
-    }
-
-    var topModelsFetchMode: TopModelsFetchMode {
-        get {
-            let raw = userDefaults.string(forKey: "top_models_fetch_mode") ?? TopModelsFetchMode.publicAPI.rawValue
-            return TopModelsFetchMode(rawValue: raw) ?? .publicAPI
-        }
-        set {
-            userDefaults.set(newValue.rawValue, forKey: "top_models_fetch_mode")
         }
     }
 
@@ -557,17 +460,9 @@ class OpenRouterCreditManager: ObservableObject {
         }
 
         print("[OpenRouter] TOKENS block completed, starting TOP MODELS block")
-        // MARK: - TOP MODELS block
+        // MARK: - TOP MODELS block (Public API only)
         do {
-            let topModels: TopModelsResult
-            switch topModelsFetchMode {
-            case .dataAPI:
-                topModels = try await fetchTopModelsFromAPI()
-            case .modelsAPI:
-                topModels = try await fetchTopModelsFromModelsAPI()
-            case .publicAPI:
-                topModels = try await fetchTopModelsFromPublicAPI()
-            }
+            let topModels = try await fetchTopModelsFromPublicAPI()
             await MainActor.run {
                 self.topModelsPaid = topModels.paid
                 self.topModelsFree = topModels.free
@@ -1328,240 +1223,6 @@ class OpenRouterCreditManager: ObservableObject {
         let paid: [TopModel]
         let free: [TopModel]
         let date: Date
-    }
-
-    /// Fetches top models from the Data API rankings-daily endpoint for the last 7 days,
-    /// aggregates token usage, and classifies models as paid or free.
-    private func fetchTopModelsFromAPI() async throws -> TopModelsResult {
-        // Calculate date range: last 7 days (inclusive)
-        var utcCalendar = Calendar(identifier: .gregorian)
-        utcCalendar.timeZone = TimeZone(identifier: "UTC") ?? .current
-        let endDate = utcCalendar.startOfDay(for: Date()).addingTimeInterval(-24 * 60 * 60) // Yesterday (most recent completed day)
-        let startDate = utcCalendar.date(byAdding: .day, value: -6, to: endDate)! // 7 days total
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-        dateFormatter.timeZone = TimeZone(identifier: "UTC")
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
-        let startDateString = dateFormatter.string(from: startDate)
-        let endDateString = dateFormatter.string(from: endDate)
-
-        let urlString = "https://openrouter.ai/api/v1/datasets/rankings-daily?start_date=\(startDateString)&end_date=\(endDateString)"
-        guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
-
-        if let responseString = String(data: data, encoding: .utf8) {
-            print("[OpenRouter] Top models response (\(httpResponse.statusCode)): \(responseString)")
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            throw OpenRouterAPIError(
-                statusCode: httpResponse.statusCode,
-                serverMessage: Self.decodeServerErrorMessage(from: data)
-            )
-        }
-
-        let topModelsResponse = try JSONDecoder().decode(TopModelsResponse.self, from: data)
-
-        // Aggregate tokens by model across all days
-        var modelTokens: [String: Int] = [:]
-        for entry in topModelsResponse.data {
-            // Skip the "other" aggregated row
-            if entry.model_permaslug == "other" { continue }
-            let tokens = Int(entry.total_tokens) ?? 0
-            modelTokens[entry.model_permaslug, default: 0] += tokens
-        }
-
-        // Fetch model names from Models API to get proper display names
-        let nameLookup = try await fetchModelNameLookup()
-
-        // Sort by total tokens descending and take top models
-        let sortedModels = modelTokens
-            .sorted { $0.value > $1.value }
-            .map { (permaslug, totalTokens) in
-                // Determine if free: slug ends with :free
-                let isFree = permaslug.hasSuffix(":free")
-                // Get display name from Models API lookup, fallback to permaslug-derived name
-                let displayName = nameLookup[permaslug] ?? permaslug
-                    .components(separatedBy: "/").last?
-                    .replacingOccurrences(of: ":free", with: "") ?? permaslug
-                return TopModel(
-                    modelPermaslug: permaslug,
-                    displayName: displayName,
-                    totalTokens: totalTokens,
-                    isFree: isFree
-                )
-            }
-
-        // Split into paid and free, take top 15 each
-        let paidModels = sortedModels.filter { !$0.isFree }.prefix(15)
-        let freeModels = sortedModels.filter { $0.isFree }.prefix(15)
-
-        return TopModelsResult(
-            paid: Array(paidModels),
-            free: Array(freeModels),
-            date: endDate
-        )
-    }
-
-    /// Fetches a lookup dictionary of model permaslug -> display name from Models API
-    private func fetchModelNameLookup() async throws -> [String: String] {
-        // Fetch a larger set of models to cover the permaslugs from Data API
-        let urlString = "https://openrouter.ai/api/v1/models?limit=200"
-        guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            // If Models API fails, return empty lookup (will use fallback names)
-            return [:]
-        }
-
-        let modelsResponse = try JSONDecoder().decode(ModelsAPIResponse.self, from: data)
-
-        // Build lookup: map both id and canonical_slug to display name
-        // Data API uses model_permaslug which may match either id or canonical_slug
-        var lookup: [String: String] = [:]
-        for model in modelsResponse.data {
-            lookup[model.id] = model.name
-            lookup[model.canonical_slug] = model.name
-        }
-        print("[OpenRouter] Model name lookup built with \(lookup.count) entries")
-        return lookup
-    }
-
-    // MARK: - Top Models (Models API)
-
-    /// Fetches top models from the Models API using 2 separate requests:
-    /// - Paid: sort=top-weekly, filter out :free suffix and $0 pricing, take top 15
-    /// - Free: sort=pricing-low-to-high, filter for $0 pricing, take top 15
-    private func fetchTopModelsFromModelsAPI() async throws -> TopModelsResult {
-        async let paidModels = fetchPaidTopModels()
-        async let freeModels = fetchFreeTopModels()
-        let (paid, free) = try await (paidModels, freeModels)
-
-        return TopModelsResult(
-            paid: paid,
-            free: free,
-            date: Date() // Current date since this is a snapshot
-        )
-    }
-
-    /// Fetches paid top models using sort=top-weekly, filters out :free suffix and $0 pricing, takes up to 15
-    private func fetchPaidTopModels() async throws -> [TopModel] {
-        // Request more models (50) so that after filtering out free models, we still have at least 15 paid models
-        let urlString = "https://openrouter.ai/api/v1/models?sort=top-weekly&limit=50"
-        guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
-
-        if let responseString = String(data: data, encoding: .utf8) {
-            print("[OpenRouter] Models API paid top models (\(httpResponse.statusCode)): \(responseString)")
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            throw OpenRouterAPIError(
-                statusCode: httpResponse.statusCode,
-                serverMessage: Self.decodeServerErrorMessage(from: data)
-            )
-        }
-
-        let modelsResponse = try JSONDecoder().decode(ModelsAPIResponse.self, from: data)
-
-        // Filter: exclude :free suffix models AND models with $0 pricing
-        let paidModels = modelsResponse.data
-            .filter { model in
-                let isFreeSuffix = model.id.hasSuffix(":free")
-                let promptPrice = Double(model.pricing.prompt) ?? 0
-                let completionPrice = Double(model.pricing.completion) ?? 0
-                let isFreePricing = promptPrice == 0 && completionPrice == 0
-                return !isFreeSuffix && !isFreePricing
-            }
-            .prefix(15)
-            .map { model in
-                TopModel(
-                    modelPermaslug: model.id,
-                    displayName: model.name,
-                    totalTokens: 0, // Models API doesn't provide token counts
-                    isFree: false
-                )
-            }
-
-        return Array(paidModels)
-    }
-
-    /// Fetches free top models using sort=pricing-low-to-high, takes first 15 from API response
-    private func fetchFreeTopModels() async throws -> [TopModel] {
-        let urlString = "https://openrouter.ai/api/v1/models?sort=pricing-low-to-high&limit=15"
-        guard let url = URL(string: urlString) else {
-            throw URLError(.badURL)
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
-        }
-
-        if let responseString = String(data: data, encoding: .utf8) {
-            print("[OpenRouter] Models API free top models (\(httpResponse.statusCode)): \(responseString)")
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            throw OpenRouterAPIError(
-                statusCode: httpResponse.statusCode,
-                serverMessage: Self.decodeServerErrorMessage(from: data)
-            )
-        }
-
-        let modelsResponse = try JSONDecoder().decode(ModelsAPIResponse.self, from: data)
-
-        // Take first 15 directly from API response (already sorted by pricing-low-to-high, free models first)
-        let freeModels = modelsResponse.data
-            .prefix(15)
-            .map { model in
-                TopModel(
-                    modelPermaslug: model.id,
-                    displayName: model.name,
-                    totalTokens: 0, // Models API doesn't provide token counts
-                    isFree: true
-                )
-            }
-
-        return Array(freeModels)
     }
 
     // MARK: - Top Models (Public API / Frontend)

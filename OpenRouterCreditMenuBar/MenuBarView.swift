@@ -495,11 +495,6 @@ struct MenuBarView: View {
                             .foregroundColor(.secondary)
                             .textCase(.uppercase)
                         Spacer()
-                        if creditManager.topModelsDate != nil {
-                            Text("(\(creditManager.topModelsFetchMode.rawValue))")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
                     }
 
                     if creditManager.isLoading {

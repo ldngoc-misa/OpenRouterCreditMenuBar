@@ -12,7 +12,6 @@ struct SettingsView: View {
     @State private var isEnabled: Bool = true
     @State private var openAtLogin: Bool = false
     @State private var refreshInterval: Double = 300  // default 5 minutes
-    @State private var topModelsFetchMode: OpenRouterCreditManager.TopModelsFetchMode = .modelsAPI
 
     private let refreshIntervalOptions: [Double] = [30, 60, 180, 300, 600, 1800, 3600]
 
@@ -50,25 +49,6 @@ struct SettingsView: View {
                     }
 
                     Text("How often to check credit balance")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Picker("Top Models Source", selection: $topModelsFetchMode) {
-                        ForEach(OpenRouterCreditManager.TopModelsFetchMode.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .onChange(of: topModelsFetchMode) { _, newValue in
-                        creditManager.topModelsFetchMode = newValue
-                        Task {
-                            await creditManager.fetchCredit()
-                        }
-                    }
-                    
-                    Text(topModelsFetchMode.description)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -113,7 +93,6 @@ struct SettingsView: View {
         apiKey = creditManager.apiKey
         isEnabled = creditManager.isEnabled
         refreshInterval = creditManager.refreshInterval
-        topModelsFetchMode = creditManager.topModelsFetchMode
         openAtLogin = SMAppService.mainApp.status == .enabled
     }
 
