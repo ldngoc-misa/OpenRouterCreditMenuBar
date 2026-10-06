@@ -6,6 +6,21 @@
 import Foundation
 import SwiftUI
 
+/// Formats a number in abbreviated form (e.g., 1.5K, 2.3M, 1.2B)
+func formatAbbreviated(_ number: Int) -> String {
+    let value = Double(number)
+    switch value {
+    case 1_000_000_000...:
+        return String(format: "%.1fB", value / 1_000_000_000)
+    case 1_000_000...:
+        return String(format: "%.1fM", value / 1_000_000)
+    case 1_000...:
+        return String(format: "%.1fK", value / 1_000)
+    default:
+        return "\(number)"
+    }
+}
+
 struct ModelSpending: Identifiable {
     let id = UUID()
     let modelName: String
@@ -22,10 +37,279 @@ struct ModelRequests: Identifiable {
     let modelName: String
     let providerName: String
     let count: Int
-    
+
     var providerColor: Color {
         ProviderColors.color(for: providerName)
     }
+}
+
+/// Top model entry with token usage and paid/free classification
+struct TopModel: Identifiable {
+    let id = UUID()
+    let modelPermaslug: String
+    let displayName: String
+    let totalTokens: Int
+    let isFree: Bool
+
+    var providerName: String {
+        modelPermaslug.components(separatedBy: "/").first?.lowercased() ?? "unknown"
+    }
+
+    var providerColor: Color {
+        ProviderColors.color(for: providerName)
+    }
+
+    var formattedTokens: String {
+        formatAbbreviated(totalTokens)
+    }
+}
+
+/// Response from rankings-daily endpoint
+struct TopModelsResponse: Decodable {
+    let data: [TopModelDailyEntry]
+    let meta: TopModelsMeta
+}
+
+struct TopModelDailyEntry: Decodable {
+    let date: String
+    let model_permaslug: String
+    let total_tokens: String
+}
+
+struct TopModelsMeta: Decodable {
+    let as_of: String
+    let version: String
+    let start_date: String
+    let end_date: String
+}
+
+/// Models API response types
+struct ModelsAPIResponse: Decodable {
+    let data: [ModelsAPIModel]
+    let total_count: Int
+    let links: ModelsAPILinks?
+}
+
+struct ModelsAPILinks: Decodable {
+    let next: String?
+}
+
+struct ModelsAPIModel: Decodable {
+    let id: String
+    let canonical_slug: String
+    let name: String
+    let created: Int
+    let description: String
+    let context_length: Int
+    let architecture: ModelsAPIArchitecture?
+    let pricing: ModelsAPIPricing
+    let top_provider: ModelsAPITopProvider?
+    let per_request_limits: ModelsAPIRateLimits?
+    let supported_parameters: [String]
+    let default_parameters: ModelsAPIDefaultParameters?
+    let expiration_date: String?
+    let benchmarks: ModelsAPIBenchmarks?
+}
+
+struct ModelsAPIArchitecture: Decodable {
+    let input_modalities: [String]
+    let output_modalities: [String]
+    let tokenizer: String
+    let instruct_type: String?
+}
+
+struct ModelsAPIPricing: Decodable {
+    let prompt: String
+    let completion: String
+    let request: String?
+    let image: String?
+    let web_search: String?
+    let internal_reasoning: String?
+    let input_cache_read: String?
+    let input_cache_write: String?
+    let overrides: [ModelsAPIPricingOverride]?
+}
+
+struct ModelsAPIPricingOverride: Decodable {
+    let min_prompt_tokens: Int?
+    let utc_start: Int?
+    let utc_end: Int?
+    let utc_days: [String]?
+    let prompt: String?
+    let completion: String?
+    let input_cache_read: String?
+    let input_cache_write: String?
+}
+
+struct ModelsAPITopProvider: Decodable {
+    let context_length: Int
+    let max_completion_tokens: Int
+    let is_moderated: Bool
+}
+
+struct ModelsAPIRateLimits: Decodable {
+    let prompt_tokens: Int?
+    let completion_tokens: Int?
+    let requests: Int?
+}
+
+struct ModelsAPIDefaultParameters: Decodable {
+    // Flexible - can contain various default parameter values
+}
+
+struct ModelsAPIBenchmarks: Decodable {
+    let design_arena: [ModelsAPIDesignArena]?
+}
+
+struct ModelsAPIDesignArena: Decodable {
+    let arena: String
+    let category: String
+    let elo: Double
+    let win_rate: Double
+    let rank: Int
+}
+
+/// Public API (frontend) response types
+struct PublicAPIResponse: Decodable {
+    let data: PublicAPIData
+}
+
+struct PublicAPIData: Decodable {
+    let models: [PublicAPIModel]
+    let analytics: PublicAPIAnalytics?
+    let categories: PublicAPICategories?
+    let benchmark_ranges: PublicAPIBenchmarkRanges?
+}
+
+struct PublicAPIAnalytics: Decodable {
+    let modelAnalytics: [String: PublicAPIModelAnalytics]
+    
+    // Decode as a dictionary since keys are dynamic (model permaslugs with variant)
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        do {
+            self.modelAnalytics = try container.decode([String: PublicAPIModelAnalytics].self)
+        } catch {
+            // If decoding fails, log the raw keys for debugging
+            if let jsonDict = try? container.decode([String: JSONValue].self) {
+                print("[OpenRouter] Analytics raw keys: \(Array(jsonDict.keys).prefix(20))")
+            }
+            self.modelAnalytics = [:]
+        }
+    }
+}
+
+struct PublicAPIModelAnalytics: Decodable {
+    let date: String
+    let model_permaslug: String
+    let variant: String
+    let variant_permaslug: String
+    let count: Int
+    let total_usage: Double
+    let total_completion_tokens: Int
+    let total_prompt_tokens: Int
+    let total_native_tokens_reasoning: Int
+    let num_media_prompt: Int
+    let num_media_completion: Int
+    let image_output_requests: Int
+    let num_video_prompt: Int
+    let video_output_seconds: Double
+    let rerank_documents: Int
+    let stt_transcript_characters: Int
+    let num_audio_prompt: Int
+    let total_native_tokens_cached: Int
+    let total_tool_calls: Int
+    let requests_with_tool_call_errors: Int
+    let total_byok_prompt_tokens: Int
+    let total_byok_completion_tokens: Int
+    
+    /// Total tokens = prompt + completion + reasoning
+    var totalTokens: Int {
+        total_prompt_tokens + total_completion_tokens + total_native_tokens_reasoning
+    }
+    
+    /// The full key used in the analytics dictionary (model_permaslug/variant)
+    var analyticsKey: String {
+        "\(model_permaslug)/\(variant)"
+    }
+}
+
+/// Flexible JSON value for decoding varying API structures
+enum FlexibleJSONValue: Decodable {
+    case string(String)
+    case number(Double)
+    case bool(Bool)
+    case object([String: FlexibleJSONValue])
+    case array([FlexibleJSONValue])
+    case null
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .null
+        } else if let value = try? container.decode(Bool.self) {
+            self = .bool(value)
+        } else if let value = try? container.decode(Double.self) {
+            self = .number(value)
+        } else if let value = try? container.decode(String.self) {
+            self = .string(value)
+        } else if let value = try? container.decode([FlexibleJSONValue].self) {
+            self = .array(value)
+        } else if let value = try? container.decode([String: FlexibleJSONValue].self) {
+            self = .object(value)
+        } else {
+            throw DecodingError.typeMismatch(
+                FlexibleJSONValue.self,
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unsupported JSON value")
+            )
+        }
+    }
+}
+
+/// Categories - handles both paid (model-based arrays) and free (category-name-based ranges) formats
+struct PublicAPICategories: Decodable {
+    let rawCategories: [String: FlexibleJSONValue]
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.rawCategories = try container.decode([String: FlexibleJSONValue].self)
+    }
+}
+
+/// Benchmark ranges - handles both paid (full structure) and free (only da_elo) formats
+struct PublicAPIBenchmarkRanges: Decodable {
+    let rawRanges: [String: FlexibleJSONValue]
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.rawRanges = try container.decode([String: FlexibleJSONValue].self)
+    }
+}
+
+struct PublicAPIModel: Decodable {
+    let slug: String
+    let name: String
+    let short_name: String?
+    let author: String
+    let context_length: Int
+    let input_modalities: [String]
+    let output_modalities: [String]
+    let endpoint: PublicAPIEndpoint?
+    let is_free: Bool?
+    let permaslug: String?
+}
+
+struct PublicAPIEndpoint: Decodable {
+    let model_variant_slug: String
+    let model_variant_permaslug: String?
+    let variant: String
+    let is_free: Bool
+    let pricing: PublicAPIPricing?
+}
+
+struct PublicAPIPricing: Decodable {
+    let prompt: String
+    let completion: String
 }
 
 struct ProviderColors {
@@ -64,6 +348,25 @@ struct ProviderColors {
 }
 
 class OpenRouterCreditManager: ObservableObject {
+    /// Fetch mode for top models
+    enum TopModelsFetchMode: String, CaseIterable, Identifiable {
+        case dataAPI = "Data API"
+        case modelsAPI = "Models API"
+        case publicAPI = "Public API"
+        
+        var id: String { rawValue }
+        
+        var description: String {
+            switch self {
+            case .dataAPI:
+                return "7-day token aggregation from actual usage (most accurate)"
+            case .modelsAPI:
+                return "Weekly popularity ranking from Models API (no token data)"
+            case .publicAPI:
+                return "Frontend rankings from OpenRouter website (no auth required)"
+            }
+        }
+    }
     @Published var currentCredit: Double?
     @Published var totalUsage: Double?
     @Published var spentToday: Double?
@@ -80,8 +383,24 @@ class OpenRouterCreditManager: ObservableObject {
     @Published var tokensTodayByModel: [ModelRequests] = []
     @Published var tokensThisWeek: Int?
     @Published var tokensThisWeekByModel: [ModelRequests] = []
+    @Published var topModelsPaid: [TopModel] = []
+    @Published var topModelsFree: [TopModel] = []
+    @Published var topModelsDate: Date?
     @Published var isLoading = false
-    @Published var errorMessage: String?
+    
+    // Independent error messages for each data block
+    @Published var creditErrorMessage: String?
+    @Published var requestsErrorMessage: String?
+    @Published var tokensErrorMessage: String?
+    @Published var topModelsErrorMessage: String?
+    
+    // Legacy property for backwards compatibility
+    @Published var errorMessage: String? {
+        didSet {
+            // Keep legacy property in sync with the first non-nil error
+            // This maintains backwards compatibility for any existing code
+        }
+    }
 
     private let userDefaults = UserDefaults.standard
     private var refreshTimer: Timer?
@@ -112,6 +431,16 @@ class OpenRouterCreditManager: ObservableObject {
         set {
             userDefaults.set(newValue, forKey: "refresh_interval")
             setupTimer()
+        }
+    }
+
+    var topModelsFetchMode: TopModelsFetchMode {
+        get {
+            let raw = userDefaults.string(forKey: "top_models_fetch_mode") ?? TopModelsFetchMode.publicAPI.rawValue
+            return TopModelsFetchMode(rawValue: raw) ?? .publicAPI
+        }
+        set {
+            userDefaults.set(newValue.rawValue, forKey: "top_models_fetch_mode")
         }
     }
 
@@ -148,44 +477,108 @@ class OpenRouterCreditManager: ObservableObject {
 
         await MainActor.run {
             isLoading = true
+            // Clear all block-specific error messages
+            creditErrorMessage = nil
+            requestsErrorMessage = nil
+            tokensErrorMessage = nil
+            topModelsErrorMessage = nil
             errorMessage = nil
         }
 
+        // MARK: - CREDIT block
         do {
             let creditData = try await fetchCreditFromAPI()
             let spentToday = try await fetchSpentTodayFromAPI()
             let spentTodayByModel = try await fetchSpentTodayByModelFromAPI()
-            let requestsToday = try await fetchRequestsTodayFromAPI()
-            let requestsTodayByModel = try await fetchRequestsTodayByModelFromAPI()
-            let requestsThisWeek = try await fetchWeekRequestsFromAPI()
-            let requestsThisWeekByModel = try await fetchWeekRequestsByModelFromAPI()
-            let tokensToday = try await fetchTokensTodayFromAPI()
-            let tokensTodayByModel = try await fetchTokensTodayByModelFromAPI()
-            let tokensThisWeek = try await fetchWeekTokensFromAPI()
-            let tokensThisWeekByModel = try await fetchWeekTokensByModelFromAPI()
             await MainActor.run {
                 self.currentCredit = creditData.total_credits - creditData.total_usage
                 self.totalUsage = creditData.total_usage
                 self.spentToday = spentToday.amount
                 self.spentTodayDate = spentToday.date
                 self.spentTodayByModel = spentTodayByModel
+            }
+        } catch {
+            await MainActor.run {
+                self.creditErrorMessage = error.localizedDescription
+                self.errorMessage = error.localizedDescription // Legacy compatibility
+            }
+        }
+
+        // MARK: - REQUESTS block
+        do {
+            let requestsToday = try await fetchRequestsTodayFromAPI()
+            let requestsTodayByModel = try await fetchRequestsTodayByModelFromAPI()
+            let requestsThisWeek = try await fetchWeekRequestsFromAPI()
+            let requestsThisWeekByModel = try await fetchWeekRequestsByModelFromAPI()
+            await MainActor.run {
                 self.requestsToday = requestsToday.count
                 self.requestsTodayDate = requestsToday.date
                 self.requestsTodayByModel = requestsTodayByModel
                 self.requestsThisWeek = requestsThisWeek
                 self.requestsThisWeekByModel = requestsThisWeekByModel
+            }
+        } catch {
+            await MainActor.run {
+                self.requestsErrorMessage = error.localizedDescription
+                // Only set legacy error if it's not already set
+                if self.errorMessage == nil {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
+
+        print("[OpenRouter] Starting TOKENS block")
+        // MARK: - TOKENS block
+        do {
+            let tokensToday = try await fetchTokensTodayFromAPI()
+            let tokensTodayByModel = try await fetchTokensTodayByModelFromAPI()
+            let tokensThisWeek = try await fetchWeekTokensFromAPI()
+            let tokensThisWeekByModel = try await fetchWeekTokensByModelFromAPI()
+            await MainActor.run {
                 self.tokensToday = tokensToday.count
                 self.tokensTodayDate = tokensToday.date
                 self.tokensTodayByModel = tokensTodayByModel
                 self.tokensThisWeek = tokensThisWeek
                 self.tokensThisWeekByModel = tokensThisWeekByModel
-                self.isLoading = false
+            }
+            print("[OpenRouter] TOKENS block completed successfully")
+        } catch {
+            await MainActor.run {
+                self.tokensErrorMessage = error.localizedDescription
+                if self.errorMessage == nil {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
+
+        print("[OpenRouter] TOKENS block completed, starting TOP MODELS block")
+        // MARK: - TOP MODELS block
+        do {
+            let topModels: TopModelsResult
+            switch topModelsFetchMode {
+            case .dataAPI:
+                topModels = try await fetchTopModelsFromAPI()
+            case .modelsAPI:
+                topModels = try await fetchTopModelsFromModelsAPI()
+            case .publicAPI:
+                topModels = try await fetchTopModelsFromPublicAPI()
+            }
+            await MainActor.run {
+                self.topModelsPaid = topModels.paid
+                self.topModelsFree = topModels.free
+                self.topModelsDate = topModels.date
             }
         } catch {
             await MainActor.run {
-                self.errorMessage = error.localizedDescription
-                self.isLoading = false
+                self.topModelsErrorMessage = error.localizedDescription
+                if self.errorMessage == nil {
+                    self.errorMessage = error.localizedDescription
+                }
             }
+        }
+
+        await MainActor.run {
+            self.isLoading = false
         }
     }
 
@@ -921,6 +1314,425 @@ class OpenRouterCreditManager: ObservableObject {
             let error: Error
         }
         return (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error.message
+    }
+
+    // MARK: - Top Models (Data API)
+
+    /// Result of top models fetch containing paid and free model lists
+    private struct TopModelsResult {
+        let paid: [TopModel]
+        let free: [TopModel]
+        let date: Date
+    }
+
+    /// Fetches top models from the Data API rankings-daily endpoint for the last 7 days,
+    /// aggregates token usage, and classifies models as paid or free.
+    private func fetchTopModelsFromAPI() async throws -> TopModelsResult {
+        // Calculate date range: last 7 days (inclusive)
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let endDate = utcCalendar.startOfDay(for: Date()).addingTimeInterval(-24 * 60 * 60) // Yesterday (most recent completed day)
+        let startDate = utcCalendar.date(byAdding: .day, value: -6, to: endDate)! // 7 days total
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.timeZone = TimeZone(identifier: "UTC")
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        let startDateString = dateFormatter.string(from: startDate)
+        let endDateString = dateFormatter.string(from: endDate)
+
+        let urlString = "https://openrouter.ai/api/v1/datasets/rankings-daily?start_date=\(startDateString)&end_date=\(endDateString)"
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Top models response (\(httpResponse.statusCode)): \(responseString)")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+
+        let topModelsResponse = try JSONDecoder().decode(TopModelsResponse.self, from: data)
+
+        // Aggregate tokens by model across all days
+        var modelTokens: [String: Int] = [:]
+        for entry in topModelsResponse.data {
+            // Skip the "other" aggregated row
+            if entry.model_permaslug == "other" { continue }
+            let tokens = Int(entry.total_tokens) ?? 0
+            modelTokens[entry.model_permaslug, default: 0] += tokens
+        }
+
+        // Sort by total tokens descending and take top models
+        let sortedModels = modelTokens
+            .sorted { $0.value > $1.value }
+            .map { (permaslug, totalTokens) in
+                // Determine if free: slug ends with :free
+                let isFree = permaslug.hasSuffix(":free")
+                // Create display name by removing provider prefix and :free suffix
+                let displayName = permaslug
+                    .components(separatedBy: "/").last?
+                    .replacingOccurrences(of: ":free", with: "") ?? permaslug
+                return TopModel(
+                    modelPermaslug: permaslug,
+                    displayName: displayName,
+                    totalTokens: totalTokens,
+                    isFree: isFree
+                )
+            }
+
+        // Split into paid and free, take top 15 each
+        let paidModels = sortedModels.filter { !$0.isFree }.prefix(15)
+        let freeModels = sortedModels.filter { $0.isFree }.prefix(15)
+
+        return TopModelsResult(
+            paid: Array(paidModels),
+            free: Array(freeModels),
+            date: endDate
+        )
+    }
+
+    // MARK: - Top Models (Models API)
+
+    /// Fetches top models from the Models API using 2 separate requests:
+    /// - Paid: sort=top-weekly, filter out :free suffix and $0 pricing, take top 15
+    /// - Free: sort=pricing-low-to-high, filter for $0 pricing, take top 15
+    private func fetchTopModelsFromModelsAPI() async throws -> TopModelsResult {
+        async let paidModels = fetchPaidTopModels()
+        async let freeModels = fetchFreeTopModels()
+        let (paid, free) = try await (paidModels, freeModels)
+
+        return TopModelsResult(
+            paid: paid,
+            free: free,
+            date: Date() // Current date since this is a snapshot
+        )
+    }
+
+    /// Fetches paid top models using sort=top-weekly, filters out :free suffix and $0 pricing, takes up to 15
+    private func fetchPaidTopModels() async throws -> [TopModel] {
+        // Request more models (50) so that after filtering out free models, we still have at least 15 paid models
+        let urlString = "https://openrouter.ai/api/v1/models?sort=top-weekly&limit=50"
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Models API paid top models (\(httpResponse.statusCode)): \(responseString)")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+
+        let modelsResponse = try JSONDecoder().decode(ModelsAPIResponse.self, from: data)
+
+        // Filter: exclude :free suffix models AND models with $0 pricing
+        let paidModels = modelsResponse.data
+            .filter { model in
+                let isFreeSuffix = model.id.hasSuffix(":free")
+                let promptPrice = Double(model.pricing.prompt) ?? 0
+                let completionPrice = Double(model.pricing.completion) ?? 0
+                let isFreePricing = promptPrice == 0 && completionPrice == 0
+                return !isFreeSuffix && !isFreePricing
+            }
+            .prefix(15)
+            .map { model in
+                TopModel(
+                    modelPermaslug: model.id,
+                    displayName: model.name,
+                    totalTokens: 0, // Models API doesn't provide token counts
+                    isFree: false
+                )
+            }
+
+        return Array(paidModels)
+    }
+
+    /// Fetches free top models using sort=pricing-low-to-high, takes first 15 from API response
+    private func fetchFreeTopModels() async throws -> [TopModel] {
+        let urlString = "https://openrouter.ai/api/v1/models?sort=pricing-low-to-high&limit=15"
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Models API free top models (\(httpResponse.statusCode)): \(responseString)")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+
+        let modelsResponse = try JSONDecoder().decode(ModelsAPIResponse.self, from: data)
+
+        // Take first 15 directly from API response (already sorted by pricing-low-to-high, free models first)
+        let freeModels = modelsResponse.data
+            .prefix(15)
+            .map { model in
+                TopModel(
+                    modelPermaslug: model.id,
+                    displayName: model.name,
+                    totalTokens: 0, // Models API doesn't provide token counts
+                    isFree: true
+                )
+            }
+
+        return Array(freeModels)
+    }
+
+    // MARK: - Top Models (Public API / Frontend)
+
+    /// Fetches top models from the Public API (frontend) using 2 separate requests:
+    /// - Paid: order=top-weekly
+    /// - Free: order=top-weekly&variant=free
+    /// This is a public endpoint that does NOT require authentication.
+    private func fetchTopModelsFromPublicAPI() async throws -> TopModelsResult {
+        print("[OpenRouter] fetchTopModelsFromPublicAPI called")
+        do {
+            async let paidModels = fetchPaidTopModelsFromPublicAPI()
+            async let freeModels = fetchFreeTopModelsFromPublicAPI()
+            let (paid, free) = try await (paidModels, freeModels)
+
+            return TopModelsResult(
+                paid: paid,
+                free: free,
+                date: Date()
+            )
+        } catch {
+            print("[OpenRouter] ERROR in fetchTopModelsFromPublicAPI: \(error)")
+            print("[OpenRouter] ERROR type: \(type(of: error))")
+            if let decodingError = error as? DecodingError {
+                print("[OpenRouter] DecodingError details: \(decodingError)")
+            }
+            throw error
+        }
+    }
+
+    /// Fetches paid top models using order=top-weekly from frontend API
+    private func fetchPaidTopModelsFromPublicAPI() async throws -> [TopModel] {
+        let urlString = "https://openrouter.ai/api/frontend/v1/models/find?active=true&fmt=cards&order=top-weekly"
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        // Public API is open - no authentication required
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Public API paid top models (\(httpResponse.statusCode)): \(responseString.prefix(2000))")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+
+        do {
+            let publicResponse = try JSONDecoder().decode(PublicAPIResponse.self, from: data)
+            print("[OpenRouter] Successfully decoded PublicAPIResponse for paid models")
+            return try processPublicAPIModels(publicResponse, isFree: false)
+        } catch {
+            print("[OpenRouter] ERROR decoding paid models: \(error)")
+            if let decodingError = error as? DecodingError {
+                print("[OpenRouter] DecodingError details: \(decodingError)")
+            }
+            throw error
+        }
+    }
+
+    /// Process PublicAPIResponse to extract TopModel array
+    private func processPublicAPIModels(_ publicResponse: PublicAPIResponse, isFree: Bool) throws -> [TopModel] {
+        // Build a lookup of analytics by model permaslug/variant
+        var analyticsLookup: [String: PublicAPIModelAnalytics] = [:]
+        if let analytics = publicResponse.data.analytics {
+            analyticsLookup = analytics.modelAnalytics
+            // Debug: log available analytics keys
+            print("[OpenRouter] Available analytics keys (\(isFree ? "free" : "paid")): \(Array(analyticsLookup.keys).prefix(20))")
+        }
+
+        // Filter models based on free/paid
+        let filteredModels = publicResponse.data.models.filter { model in
+            let modelIsFree = model.endpoint?.is_free == true || model.is_free == true
+            return isFree ? modelIsFree : !modelIsFree
+        }
+
+        // Take first 15 (already sorted by totalTokens descending from the API)
+        let models = filteredModels
+            .prefix(15)
+            .map { model in
+                let permaslug = model.permaslug ?? model.slug
+                // Try multiple key formats to match analytics
+                let possibleKeys = [
+                    "\(permaslug)/standard",
+                    "\(permaslug)/free",
+                    model.endpoint?.model_variant_permaslug ?? "",
+                    model.endpoint?.model_variant_slug ?? ""
+                ].filter { !$0.isEmpty }
+
+                var totalTokens = 0
+                for key in possibleKeys {
+                    if let tokens = analyticsLookup[key]?.totalTokens {
+                        totalTokens = tokens
+                        break
+                    }
+                }
+
+                if totalTokens == 0 {
+                    print("[OpenRouter] No analytics match for \(isFree ? "free" : "paid") model: \(permaslug), tried keys: \(possibleKeys)")
+                }
+
+                return TopModel(
+                    modelPermaslug: permaslug,
+                    displayName: model.short_name ?? model.name,
+                    totalTokens: totalTokens,
+                    isFree: isFree
+                )
+            }
+
+        return Array(models)
+    }
+
+    /// Fetches free top models using order=top-weekly&variant=free from frontend API
+    private func fetchFreeTopModelsFromPublicAPI() async throws -> [TopModel] {
+        let urlString = "https://openrouter.ai/api/frontend/v1/models/find?active=true&fmt=cards&order=top-weekly&variant=free"
+        guard let url = URL(string: urlString) else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        // Public API is open - no authentication required
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("[OpenRouter] Public API free top models (\(httpResponse.statusCode)): \(responseString)")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw OpenRouterAPIError(
+                statusCode: httpResponse.statusCode,
+                serverMessage: Self.decodeServerErrorMessage(from: data)
+            )
+        }
+
+        do {
+            let publicResponse = try JSONDecoder().decode(PublicAPIResponse.self, from: data)
+            print("[OpenRouter] Successfully decoded PublicAPIResponse for free models")
+
+            // Build a lookup of analytics by model permaslug/variant
+            var analyticsLookup: [String: PublicAPIModelAnalytics] = [:]
+            if let analytics = publicResponse.data.analytics {
+                analyticsLookup = analytics.modelAnalytics
+                // Debug: log available analytics keys
+                print("[OpenRouter] Available analytics keys (free): \(Array(analyticsLookup.keys).prefix(20))")
+            }
+        
+        // Debug: log model permaslugs and variant permaslugs
+        for model in publicResponse.data.models.prefix(10) {
+            print("[OpenRouter] Model: permaslug=\(model.permaslug ?? "nil"), slug=\(model.slug), variant_permaslug=\(model.endpoint?.model_variant_permaslug ?? "nil"), variant=\(model.endpoint?.variant ?? "nil"), is_free=\(model.endpoint?.is_free ?? false)")
+        }
+
+        // Take first 15 (already filtered for free by variant=free)
+        // Models are already sorted by totalTokens descending from the API
+        let freeModels = publicResponse.data.models
+            .prefix(15)
+            .map { model in
+                let permaslug = model.permaslug ?? model.slug
+                // Try multiple key formats to match analytics
+                let possibleKeys = [
+                    "\(permaslug)/free",
+                    "\(permaslug)/standard",
+                    model.endpoint?.model_variant_permaslug ?? "",
+                    model.endpoint?.model_variant_slug ?? ""
+                ].filter { !$0.isEmpty }
+                
+                var totalTokens = 0
+                for key in possibleKeys {
+                    if let tokens = analyticsLookup[key]?.totalTokens {
+                        totalTokens = tokens
+                        break
+                    }
+                }
+                
+                if totalTokens == 0 {
+                    print("[OpenRouter] No analytics match for free model: \(permaslug), tried keys: \(possibleKeys)")
+                }
+                
+                return TopModel(
+                    modelPermaslug: permaslug,
+                    displayName: model.short_name ?? model.name,
+                    totalTokens: totalTokens,
+                    isFree: true
+                )
+            }
+
+        return Array(freeModels)
+        } catch {
+            print("[OpenRouter] ERROR decoding free models: \(error)")
+            if let decodingError = error as? DecodingError {
+                print("[OpenRouter] DecodingError details: \(decodingError)")
+            }
+            throw error
+        }
     }
 }
 

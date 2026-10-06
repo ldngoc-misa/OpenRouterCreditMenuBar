@@ -5,41 +5,36 @@
 
 import SwiftUI
 
-/// Formats a number in abbreviated form (e.g., 1.5K, 2.3M, 1.2B)
-func formatAbbreviated(_ number: Int) -> String {
-    let value = Double(number)
-    switch value {
-    case 1_000_000_000...:
-        return String(format: "%.1fB", value / 1_000_000_000)
-    case 1_000_000...:
-        return String(format: "%.1fM", value / 1_000_000)
-    case 1_000...:
-        return String(format: "%.1fK", value / 1_000)
-    default:
-        return "\(number)"
-    }
-}
-
 // Custom toolbar button with hover effect
 struct ToolbarButton: View {
     let systemName: String
     let tooltip: String
     let action: () -> Void
+    var isLoading: Bool = false
     @State private var isHovering = false
     
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
-                .frame(width: 28, height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(isHovering ? Color.white.opacity(0.2) : Color.clear)
-                )
+            ZStack {
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .frame(width: 16, height: 16)
+                } else {
+                    Image(systemName: systemName)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                }
+            }
+            .frame(width: 28, height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isHovering ? Color.white.opacity(0.2) : Color.clear)
+            )
         }
         .buttonStyle(.plain)
         .help(tooltip)
+        .disabled(isLoading)
         .onHover { hovering in
             isHovering = hovering
         }
@@ -296,7 +291,7 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            // MARK: - Title (full width)
+            // MARK: - Title Bar with buttons
             HStack(spacing: 6) {
                 Image(systemName: "creditcard")
                     .foregroundColor(.blue)
@@ -304,8 +299,45 @@ struct MenuBarView: View {
                 Text("OpenRouter Credit")
                     .font(.system(size: 13, weight: .medium))
                 Spacer()
+                
+                // Toolbar buttons moved to title bar (right-aligned)
+                ToolbarButton(
+                    systemName: "arrow.clockwise",
+                    tooltip: "Refresh",
+                    action: {
+                        Task {
+                            await creditManager.fetchCredit()
+                        }
+                    },
+                    isLoading: creditManager.isLoading
+                )
+                
+                ToolbarButton(
+                    systemName: "globe",
+                    tooltip: "View Activity"
+                ) {
+                    if let url = URL(string: "https://openrouter.ai/activity") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                
+                SettingsLink {
+                    SettingsToolbarButton(systemName: "gearshape")
+                }
+                .buttonStyle(.plain)
+                .help("Settings")
+                
+                ToolbarButton(
+                    systemName: "power",
+                    tooltip: "Quit"
+                ) {
+                    NSApplication.shared.terminate(nil)
+                }
             }
             .padding(.vertical, 4)
+            
+            // Separator after title bar
+            Divider()
 
             // MARK: - Middle Section: Left Content (3 blocks) + Right Content (TOP MODELS)
             HStack(alignment: .top, spacing: 16) {
@@ -343,7 +375,7 @@ struct MenuBarView: View {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                        } else if let error = creditManager.errorMessage {
+                        } else if let error = creditManager.creditErrorMessage {
                             VStack(spacing: 4) {
                                 Image(systemName: "exclamationmark.triangle")
                                     .foregroundColor(.orange)
@@ -389,7 +421,7 @@ struct MenuBarView: View {
                                     popoverTitle: "Requests This Week by Model"
                                 )
                             }
-                        } else if let error = creditManager.errorMessage {
+                        } else if let error = creditManager.requestsErrorMessage {
                             VStack(spacing: 4) {
                                 Image(systemName: "exclamationmark.triangle")
                                     .foregroundColor(.orange)
@@ -435,7 +467,7 @@ struct MenuBarView: View {
                                     popoverTitle: "Tokens This Week by Model"
                                 )
                             }
-                        } else if let error = creditManager.errorMessage {
+                        } else if let error = creditManager.tokensErrorMessage {
                             VStack(spacing: 4) {
                                 Image(systemName: "exclamationmark.triangle")
                                     .foregroundColor(.orange)
@@ -451,24 +483,74 @@ struct MenuBarView: View {
                 }
                 .frame(width: 220)
 
+                // Vertical separator between left blocks and TOP MODELS
+                Divider()
+                    .frame(height: nil)
+
                 // Right Column: TOP MODELS - height matches the 3 left blocks
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("TOP MODELS")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .textCase(.uppercase)
+                    HStack {
+                        Text("TOP MODELS")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .textCase(.uppercase)
+                        Spacer()
+                        if creditManager.topModelsDate != nil {
+                            Text("(\(creditManager.topModelsFetchMode.rawValue))")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
 
-                    HStack(alignment: .top, spacing: 12) {
+                    if creditManager.isLoading {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading...")
+                                .font(.caption)
+                        }
+                    } else if let error = creditManager.topModelsErrorMessage {
+                        VStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.orange)
+                            Text("Error")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(error)
+                                .font(.caption2)
+                                .multilineTextAlignment(.center)
+                        }
+                    } else {
+                        HStack(alignment: .top, spacing: 12) {
                         // Paid models column
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Paid")
                                 .font(.caption2)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.secondary)
-                            Text("Coming soon")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .italic()
+                            if creditManager.topModelsPaid.isEmpty {
+                                Text("No data")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .italic()
+                            } else {
+                                ForEach(creditManager.topModelsPaid) { model in
+                                    HStack(spacing: 6) {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(model.providerColor)
+                                            .frame(width: 3, height: 12)
+                                        Text(model.displayName)
+                                            .font(.caption2)
+                                            .lineLimit(1)
+                                            .truncationMode(.middle)
+                                        Spacer()
+                                        Text(model.totalTokens > 0 ? model.formattedTokens : "N/A")
+                                            .font(.caption2)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -478,55 +560,38 @@ struct MenuBarView: View {
                                 .font(.caption2)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.secondary)
-                            Text("Coming soon")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .italic()
+                            if creditManager.topModelsFree.isEmpty {
+                                Text("No data")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .italic()
+                            } else {
+                                ForEach(creditManager.topModelsFree) { model in
+                                    HStack(spacing: 6) {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(model.providerColor)
+                                            .frame(width: 3, height: 12)
+                                        Text(model.displayName)
+                                            .font(.caption2)
+                                            .lineLimit(1)
+                                            .truncationMode(.middle)
+                                        Spacer()
+                                        Text(model.totalTokens > 0 ? model.formattedTokens : "N/A")
+                                            .font(.caption2)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
                     Spacer(minLength: 0)
                 }
+            }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-
-            Divider()
-
-            // MARK: - Toolbar (full width)
-            HStack(spacing: 8) {
-                ToolbarButton(
-                    systemName: "arrow.clockwise",
-                    tooltip: "Refresh"
-                ) {
-                    Task {
-                        await creditManager.fetchCredit()
-                    }
-                }
-
-                ToolbarButton(
-                    systemName: "globe",
-                    tooltip: "View Activity"
-                ) {
-                    if let url = URL(string: "https://openrouter.ai/activity") {
-                        NSWorkspace.shared.open(url)
-                    }
-                }
-
-                SettingsLink {
-                    SettingsToolbarButton(systemName: "gearshape")
-                }
-                .buttonStyle(.plain)
-                .help("Settings")
-
-                ToolbarButton(
-                    systemName: "power",
-                    tooltip: "Quit"
-                ) {
-                    NSApplication.shared.terminate(nil)
-                }
-            }
-            .padding(.vertical, 6)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
