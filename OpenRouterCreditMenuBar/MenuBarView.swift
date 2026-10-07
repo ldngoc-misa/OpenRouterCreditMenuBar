@@ -234,6 +234,7 @@ struct SettingsToolbarButton: View {
 // Scrollable model list row
 struct ModelListRow: View {
     let model: TopModel
+    @State private var isHovering = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -242,13 +243,14 @@ struct ModelListRow: View {
                 .fill(model.providerColor)
                 .frame(width: 3, height: 12)
 
-            // Model Name
-            Text(model.displayName)
+            // Model Name - shows displayName normally, slug on hover
+            Text(isHovering ? model.slug : model.displayName)
                 .font(.caption2)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .layoutPriority(1)
+                .foregroundColor(isHovering ? .primary : .primary)
 
             // Total Tokens
             Text(model.totalTokens > 0 ? model.formattedTokens : "N/A")
@@ -273,6 +275,20 @@ struct ModelListRow: View {
                 .frame(width: 35, alignment: .trailing)
         }
         .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isHovering ? Color.white.opacity(0.08) : Color.clear)
+        )
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .onTapGesture {
+            // Copy slug to clipboard
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(model.slug, forType: .string)
+        }
+        .help("Click to copy slug: \(model.slug)")
     }
 }
 
@@ -280,6 +296,9 @@ struct ModelListRow: View {
 struct ModelColumn: View {
     let title: String
     let models: [TopModel]
+    let sortMode: PaidModelSortMode
+    let onTokensClick: () -> Void
+    let onPriceClick: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -297,7 +316,12 @@ struct ModelColumn: View {
             } else {
                 VStack(spacing: 0) {
                     // Column headers
-                    ModelColumnHeader(isFree: models.first?.isFree ?? false)
+                    ModelColumnHeader(
+                        isFree: models.first?.isFree ?? false,
+                        sortMode: sortMode,
+                        onTokensClick: onTokensClick,
+                        onPriceClick: onPriceClick
+                    )
 
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
@@ -316,34 +340,73 @@ struct ModelColumn: View {
 // Column header row
 struct ModelColumnHeader: View {
     let isFree: Bool
+    let sortMode: PaidModelSortMode
+    let onTokensClick: () -> Void
+    let onPriceClick: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
-            // Empty space for color indicator
-            Color.clear
-                .frame(width: 3, height: 12)
+            // Color indicator space (3px) + Model header that overflows into model name column
+            ZStack(alignment: .leading) {
+                // Invisible color indicator spacer
+                Color.clear
+                    .frame(width: 3, height: 12)
 
-            // Model Name
-            Text("Model")
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            // Tokens
-            Text("Tokens")
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-                .frame(width: 50, alignment: .trailing)
-
-            // Price (only for paid)
-            if !isFree {
-                Text("Price")
+                // Model header - starts at left edge (aligned with color indicator), overflows into model name column
+                Text("Model")
                     .font(.caption2)
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Spacer to push other headers to the right
+            Spacer(minLength: 0)
+
+            // Tokens header - clickable for paid models
+            Button(action: onTokensClick) {
+                HStack(spacing: 2) {
+                    Text("Tokens")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                    // Sort indicator for tokens
+                    if sortMode == .tokensDesc {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(.secondary.opacity(0.6))
+                    }
+                }
+                .frame(width: 50, alignment: .trailing)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isFree) // Only paid models can sort by tokens (it's the default anyway)
+
+            // Price header - clickable for paid models (cycles through price desc/asc)
+            if !isFree {
+                Button(action: onPriceClick) {
+                    HStack(spacing: 2) {
+                        Text("Price")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                        // Sort indicator for price
+                        if sortMode == .priceDesc {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(.secondary.opacity(0.6))
+                        } else if sortMode == .priceAsc {
+                            Image(systemName: "chevron.up")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(.secondary.opacity(0.6))
+                        }
+                    }
                     .frame(width: 80, alignment: .trailing)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
 
             // Context
@@ -412,10 +475,11 @@ struct TopModelsBlock: View {
     let errorMessage: String?
     let paidModels: [TopModel]
     let freeModels: [TopModel]
-    
+    @ObservedObject var creditManager: OpenRouterCreditManager
+
     // Height for 15 items per column: header(24) + 15 items * 18px = ~300px
-    private let blockHeight: CGFloat = 300
-    
+    let blockHeight: CGFloat = 300
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -424,8 +488,36 @@ struct TopModelsBlock: View {
                     .foregroundColor(.secondary)
                     .textCase(.uppercase)
                 Spacer()
+
+                // Search text field
+                HStack(spacing: 4) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    TextField("Filter model name...", text: $creditManager.topModelsSearchText)
+                        .textFieldStyle(.plain)
+                        .font(.caption2)
+                        .frame(width: 140)
+                        .padding(.vertical, 2)
+                        .padding(.horizontal, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.white.opacity(0.08))
+                        )
+                }
+
+                // Price filter picker (only for paid)
+                Picker("", selection: $creditManager.topModelsPriceFilter) {
+                    ForEach(PriceFilter.allCases, id: \.self) { filter in
+                        Text(filter.rawValue).tag(filter)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 100)
+                .font(.caption2)
+                .labelsHidden()
             }
-            
+
             Group {
                 if isLoading {
                     HStack {
@@ -449,8 +541,27 @@ struct TopModelsBlock: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     HStack(alignment: .top, spacing: 16) {
-                        ModelColumn(title: "Paid", models: paidModels)
-                        ModelColumn(title: "Free", models: freeModels)
+                        ModelColumn(
+                            title: "Paid",
+                            models: paidModels,
+                            sortMode: creditManager.paidModelsSortMode,
+                            onTokensClick: { creditManager.paidModelsSortMode = .tokensDesc },
+                            onPriceClick: {
+                                // Cycle: tokensDesc -> priceAsc -> priceDesc -> tokensDesc
+                                switch creditManager.paidModelsSortMode {
+                                case .tokensDesc: creditManager.paidModelsSortMode = .priceAsc
+                                case .priceAsc: creditManager.paidModelsSortMode = .priceDesc
+                                case .priceDesc: creditManager.paidModelsSortMode = .tokensDesc
+                                }
+                            }
+                        )
+                        ModelColumn(
+                            title: "Free",
+                            models: freeModels,
+                            sortMode: .tokensDesc, // Free models always sorted by tokens
+                            onTokensClick: {}, // No-op for free
+                            onPriceClick: {} // No-op for free
+                        )
                     }
                     .frame(maxWidth: .infinity, alignment: .top)
                 }
@@ -463,7 +574,7 @@ struct TopModelsBlock: View {
 
 struct MenuBarView: View {
     @EnvironmentObject var creditManager: OpenRouterCreditManager
-    
+
     /// Label showing which day the "Spend" value refers to.
     /// Days are compared in UTC to stay consistent with the API's UTC-based data.
     private var spentTodayLabel: String {
@@ -658,7 +769,8 @@ struct MenuBarView: View {
                 isLoading: creditManager.isLoading,
                 errorMessage: creditManager.topModelsErrorMessage,
                 paidModels: creditManager.topModelsPaid,
-                freeModels: creditManager.topModelsFree
+                freeModels: creditManager.topModelsFree,
+                creditManager: creditManager
             )
             .frame(maxWidth: .infinity, alignment: .topLeading)
             

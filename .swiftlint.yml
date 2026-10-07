@@ -1,0 +1,164 @@
+# SwiftLint Configuration for OpenRouterCreditMenuBar
+# Install: brew install swiftlint
+
+# Paths to include
+included:
+  - OpenRouterCreditMenuBar
+
+# Paths to exclude
+excluded:
+  - build
+  - release
+  - OpenRouterCreditMenuBarTests
+  - OpenRouterCreditMenuBarUITests
+  - .build
+  - Pods
+
+# Opt-in rules
+opt_in_rules:
+  - empty_count
+  - explicit_init
+  - force_unwrapping
+  - implicit_return
+  - multiline_arguments
+  - multiline_parameters
+  - overridden_super_call
+  - private_outlet
+  - redundant_nil_coalescing
+  - sorted_imports
+  - toggle_bool
+  - unavailable_function
+  - unused_import
+  - yoda_condition
+
+# Only rules (disable all others)
+only_rules: []
+
+# Analyzer rules (require compilation)
+analyzer_rules:
+  - explicit_self
+  - unused_import
+
+# Rule configurations
+disabled_rules:
+  - trailing_whitespace  # Allow trailing whitespace in string literals
+  - line_length          # We handle this with SwiftFormat
+  - file_length          # Some files are long (OpenRouterCreditManager)
+  - type_body_length     # Manager class is large
+  - function_body_length # Some fetch functions are long
+  - cyclomatic_complexity
+  - nesting
+
+# Severity overrides
+custom_rules:
+  # Force try? should be avoided
+  force_try:
+    name: "Force Try"
+    regex: "try!"
+    message: "Force try should be avoided, use try? or do/catch"
+    severity: warning
+
+  # Mark TODO/FIXME comments
+  todo:
+    name: "TODO/FIXME"
+    regex: "(TODO|FIXME):"
+    message: "TODO/FIXME found"
+    severity: warning
+
+  # Discourage print statements in production code
+  print_statement:
+    name: "Print Statement"
+    regex: '\\bprint\('
+    message: "Avoid print() in production, use os_log or Logger"
+    severity: warning
+    excluded:
+      - "Tests"
+
+# Rule specific configurations
+identifier_name:
+  min_length: 2
+  max_length: 50
+  excluded:
+    - "id"
+    - "URL"
+    - "API"
+    - "UI"
+    - "GC"
+    - "AX"
+    - "OS"
+    - "SM"
+    - "NS"
+    - "AI"
+    - "ML"
+    # API response field names (snake_case from JSON)
+    - "benchmark_ranges"
+    - "model_permaslug"
+    - "variant_permaslug"
+    - "total_usage"
+    - "total_completion_tokens"
+    - "total_prompt_tokens"
+    - "total_native_tokens_reasoning"
+    - "num_media_prompt"
+    - "num_media_completion"
+    - "image_output_requests"
+    - "num_video_prompt"
+    - "video_output_seconds"
+    - "rerank_documents"
+    - "stt_transcript_characters"
+    - "num_audio_prompt"
+    - "total_native_tokens_cached"
+    - "total_tool_calls"
+    - "requests_with_tool_call_errors"
+    - "total_byok_prompt_tokens"
+    - "total_byok_completion_tokens"
+    - "short_name"
+    - "context_length"
+    - "input_modalities"
+    - "output_modalities"
+    - "is_free"
+    - "model_variant_slug"
+    - "model_variant_permaslug"
+    - "total_credits"
+    - "time_range"
+    - "r"
+    - "g"
+    - "b"
+
+type_name:
+  min_length: 3
+  max_length: 50
+
+function_parameter_count:
+  warning: 6
+  error: 8
+
+function_body_length:
+  warning: 60
+  error: 100
+
+line_length:
+  warning: 120
+  error: 160
+
+file_length:
+  warning: 500
+  error: 1000
+
+type_body_length:
+  warning: 300
+  error: 500
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+nesting:
+  type_level:
+    warning: 2
+    error: 3
+  function_level:
+    warning: 4
+    error: 5
+
+# Reporter
+reporter: "xcode"

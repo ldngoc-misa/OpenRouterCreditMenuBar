@@ -5,6 +5,7 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
 /// Formats a number in abbreviated form (e.g., 1.5K, 2.3M, 1.2B, 3.4T)
 func formatAbbreviated(_ number: Int) -> String {
@@ -122,6 +123,7 @@ struct ModelRequests: Identifiable {
 struct TopModel: Identifiable {
     let id = UUID()
     let modelPermaslug: String
+    let slug: String             // Short slug without date suffix (e.g., "deepseek/deepseek-v4.1-flash")
     let displayName: String
     let totalTokens: Int
     let isFree: Bool
@@ -396,13 +398,34 @@ class OpenRouterCreditManager: ObservableObject {
     @Published var topModelsFree: [TopModel] = []
     @Published var topModelsDate: Date?
     @Published var isLoading = false
-    
+
+    // Filter state for Top Models (applied before taking top 15)
+    @Published var topModelsSearchText = ""
+    @Published var topModelsPriceFilter: PriceFilter = .unlimited {
+        didSet {
+            // Re-apply filters when price filter changes (on cached data)
+            reapplyTopModelsFilters()
+        }
+    }
+
+    // Sort state for Paid models
+    @Published var paidModelsSortMode: PaidModelSortMode = .tokensDesc {
+        didSet {
+            // Re-apply filters/sort when sort mode changes (on cached data)
+            reapplyTopModelsFilters()
+        }
+    }
+
+    // Cached full model lists from API (before filtering)
+    private var cachedPaidModels: [TopModel] = []
+    private var cachedFreeModels: [TopModel] = []
+
     // Independent error messages for each data block
     @Published var creditErrorMessage: String?
     @Published var requestsErrorMessage: String?
     @Published var tokensErrorMessage: String?
     @Published var topModelsErrorMessage: String?
-    
+
     // Legacy property for backwards compatibility
     @Published var errorMessage: String? {
         didSet {
@@ -443,8 +466,26 @@ class OpenRouterCreditManager: ObservableObject {
         }
     }
 
+    private var filterCancellables = Set<AnyCancellable>()
+
     init() {
         setupTimer()
+        setupFilterObservers()
+    }
+
+    private func setupFilterObservers() {
+        // Re-apply filters locally when filter state changes (no API call needed)
+        // topModelsPriceFilter and paidModelsSortMode use didSet to trigger reapplyTopModelsFilters()
+
+        // Debounced search text (300ms)
+        $topModelsSearchText
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.reapplyTopModelsFilters()
+            }
+            .store(in: &filterCancellables)
     }
 
     private func setupTimer() {
@@ -464,6 +505,15 @@ class OpenRouterCreditManager: ObservableObject {
         Task {
             await fetchCredit()
         }
+    }
+
+    func pauseMonitoring() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+    }
+
+    func resumeMonitoring() {
+        setupTimer()
     }
 
     func stopMonitoring() {
@@ -1329,9 +1379,15 @@ class OpenRouterCreditManager: ObservableObject {
             async let freeModels = fetchFreeTopModelsFromPublicAPI()
             let (paid, free) = try await (paidModels, freeModels)
 
+            // Cache full lists, then apply filters and sort
+            cachedPaidModels = paid
+            cachedFreeModels = free
+            let filteredPaid = applyFiltersAndLimitAndSort(paid, isFree: false)
+            let filteredFree = applyFiltersAndLimitAndSort(free, isFree: true)
+
             return TopModelsResult(
-                paid: paid,
-                free: free,
+                paid: filteredPaid,
+                free: filteredFree,
                 date: Date()
             )
         } catch {
@@ -1342,6 +1398,69 @@ class OpenRouterCreditManager: ObservableObject {
             }
             throw error
         }
+    }
+
+    /// Re-applies filters and sort on cached model lists (called when filter/sort changes)
+    func reapplyTopModelsFilters() {
+        let filteredPaid = applyFiltersAndLimitAndSort(cachedPaidModels, isFree: false)
+        let filteredFree = applyFiltersAndLimitAndSort(cachedFreeModels, isFree: true)
+
+        DispatchQueue.main.async {
+            self.topModelsPaid = filteredPaid
+            self.topModelsFree = filteredFree
+            self.topModelsDate = Date()
+        }
+    }
+
+    /// Applies search and price filters, then sorts, then returns top 15 models
+    private func applyFiltersAndLimitAndSort(_ models: [TopModel], isFree: Bool) -> [TopModel] {
+        let searchText = topModelsSearchText
+        let priceFilter = topModelsPriceFilter
+        let sortMode = isFree ? PaidModelSortMode.tokensDesc : paidModelsSortMode // Free models always sorted by tokens
+
+        let filtered = models.filter { model in
+            // Search filter (applies to both name and slug)
+            let matchesSearch = searchText.isEmpty ||
+                model.displayName.localizedCaseInsensitiveContains(searchText) ||
+                model.slug.localizedCaseInsensitiveContains(searchText)
+
+            // Price filter (only for paid models)
+            let matchesPrice: Bool
+            if isFree {
+                matchesPrice = true // Free models don't have price filter
+            } else if let maxPrice = priceFilter.maxPrice,
+                      let outputPriceStr = model.outputPrice,
+                      let outputPrice = Double(outputPriceStr) {
+                let pricePerMillion = outputPrice * 1_000_000
+                matchesPrice = pricePerMillion <= maxPrice
+            } else {
+                matchesPrice = true // Unlimited or no price data
+            }
+
+            return matchesSearch && matchesPrice
+        }
+
+        // Apply sorting
+        let sorted: [TopModel]
+        switch sortMode {
+        case .tokensDesc:
+            sorted = filtered.sorted { $0.totalTokens > $1.totalTokens }
+        case .priceDesc:
+            sorted = filtered.sorted { model1, model2 in
+                let price1 = (Double(model1.outputPrice ?? "0") ?? 0) * 1_000_000
+                let price2 = (Double(model2.outputPrice ?? "0") ?? 0) * 1_000_000
+                return price1 > price2
+            }
+        case .priceAsc:
+            sorted = filtered.sorted { model1, model2 in
+                let price1 = (Double(model1.outputPrice ?? "0") ?? 0) * 1_000_000
+                let price2 = (Double(model2.outputPrice ?? "0") ?? 0) * 1_000_000
+                return price1 < price2
+            }
+        }
+
+        // Return top 15 after filtering and sorting
+        return Array(sorted.prefix(15))
     }
 
     /// Fetches paid top models using order=top-weekly from frontend API
@@ -1402,9 +1521,9 @@ class OpenRouterCreditManager: ObservableObject {
             return isFree ? modelIsFree : !modelIsFree
         }
 
-        // Take first 15 (already sorted by totalTokens descending from the API)
+        // Take all models (already sorted by totalTokens descending from the API)
+        // Filtering and limiting to 15 will be done in applyFiltersAndLimit
         let models = filteredModels
-            .prefix(15)
             .map { model in
                 let permaslug = model.permaslug ?? model.slug
                 // Try multiple key formats to match analytics
@@ -1433,6 +1552,7 @@ class OpenRouterCreditManager: ObservableObject {
 
                 return TopModel(
                     modelPermaslug: permaslug,
+                    slug: model.slug,
                     displayName: model.short_name ?? model.name,
                     totalTokens: totalTokens,
                     isFree: isFree,
@@ -1491,10 +1611,10 @@ class OpenRouterCreditManager: ObservableObject {
             print("[OpenRouter] Model: permaslug=\(model.permaslug ?? "nil"), slug=\(model.slug), variant_permaslug=\(model.endpoint?.model_variant_permaslug ?? "nil"), variant=\(model.endpoint?.variant ?? "nil"), is_free=\(model.endpoint?.is_free ?? false)")
         }
 
-        // Take first 15 (already filtered for free by variant=free)
+        // Take all models (already filtered for free by variant=free)
         // Models are already sorted by totalTokens descending from the API
+        // Filtering and limiting to 15 will be done in applyFiltersAndLimit
         let freeModels = publicResponse.data.models
-            .prefix(15)
             .map { model in
                 let permaslug = model.permaslug ?? model.slug
                 // Try multiple key formats to match analytics
@@ -1523,6 +1643,7 @@ class OpenRouterCreditManager: ObservableObject {
 
                 return TopModel(
                     modelPermaslug: permaslug,
+                    slug: model.slug,
                     displayName: model.short_name ?? model.name,
                     totalTokens: totalTokens,
                     isFree: true,
@@ -1650,6 +1771,40 @@ enum JSONValue: Decodable {
     var stringValue: String? {
         if case .string(let value) = self { return value }
         return nil
+    }
+}
+
+// Filter options for Top Models
+enum PriceFilter: String, CaseIterable {
+    case unlimited = "Unlimited"
+    case under1 = "Under $1"
+    case under2 = "Under $2"
+    case under5 = "Under $5"
+    case under10 = "Under $10"
+
+    var maxPrice: Double? {
+        switch self {
+        case .unlimited: return nil
+        case .under1: return 1.0
+        case .under2: return 2.0
+        case .under5: return 5.0
+        case .under10: return 10.0
+        }
+    }
+}
+
+/// Sort mode for Paid models
+enum PaidModelSortMode: String, CaseIterable {
+    case tokensDesc = "Tokens ↓"
+    case priceDesc = "Price ↓"
+    case priceAsc = "Price ↑"
+
+    var displayName: String {
+        switch self {
+        case .tokensDesc: return "Tokens"
+        case .priceDesc: return "Price ↓"
+        case .priceAsc: return "Price ↑"
+        }
     }
 }
 

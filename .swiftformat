@@ -1,0 +1,77 @@
+# SwiftFormat Configuration for OpenRouterCreditMenuBar
+# Install: brew install swiftformat
+
+# Version compatibility
+swiftversion 6.0
+
+# Indentation
+indent 4
+tabwidth 4
+indentcase true
+indentswitchcase true
+
+# Line length
+maxwidth 120
+
+# Spacing
+spacearoundoperators true
+spacearoundbraces true
+spacearoundbrackets false
+spacearoundparens false
+spaceatstartofblock true
+spaceatendofline true
+
+# Braces
+allman false
+braces inline
+braceelse true
+
+# Semicolons
+semicolons never
+
+# Trailing commas
+commas inline
+commas removelast
+
+# Modifiers
+modifierorder preferred
+
+# Attributes
+attributes inline
+attributeindent false
+
+# Imports
+imports sorted
+imports no-duplicates
+
+# Self
+self insert
+self required
+
+# Closures
+closure-spacing always
+trailingclosure always
+
+# Numbers
+decimalgrouping 3
+exponentcase lowercase
+hexliteralcase lowercase
+
+# Strings
+stringinterpolation reduce
+stripinit true
+
+# Wrapping
+wrapcollections beforefirst
+wraparguments beforefirst
+wrapproperties preserve
+wrappenumcases auto
+
+# Headers
+header ignore
+
+# Exclusions
+exclude build,release,.build,Pods,DerivedData
+
+# Rules to disable (handled by SwiftLint or project-specific)
+disable blankLinesAtEndOfScope,blankLinesAtStartOfScope,consecutiveBlankLines,redundantParens,redundantType,sortImports,unusedArguments,void

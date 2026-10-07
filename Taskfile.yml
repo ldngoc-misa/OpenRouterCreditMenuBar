@@ -21,9 +21,39 @@ tasks:
             - sleep 2
             - echo "Cleaned build artifacts"
 
+    lint:
+        desc: Run SwiftLint on source files
+        cmds:
+            - |
+                if ! command -v swiftlint &> /dev/null; then
+                  echo "SwiftLint not found. Install: brew install swiftlint"
+                  exit 1
+                fi
+            - swiftlint lint OpenRouterCreditMenuBar --config .swiftlint.yml
+
+    format:
+        desc: Run SwiftFormat on source files
+        cmds:
+            - |
+                if ! command -v swiftformat &> /dev/null; then
+                  echo "SwiftFormat not found. Install: brew install swiftformat"
+                  exit 1
+                fi
+            - swiftformat OpenRouterCreditMenuBar --config .swiftformat
+
+    format-check:
+        desc: Check formatting without modifying files
+        cmds:
+            - |
+                if ! command -v swiftformat &> /dev/null; then
+                  echo "SwiftFormat not found. Install: brew install swiftformat"
+                  exit 1
+                fi
+            - swiftformat --dryrun OpenRouterCreditMenuBar --config .swiftformat
+
     build:
         desc: Build Release version
-        deps: [clean]
+        deps: [clean, lint]
         cmds:
             - |
                 if pgrep -x "Xcode" > /dev/null; then
@@ -37,11 +67,11 @@ tasks:
                   -configuration Release \
                   -derivedDataPath ./build \
                   -destination "platform=macOS,arch=arm64" \
-                  clean build
+                  clean build | xcbeautify
 
     build-universal:
         desc: Build Universal app (arm64 + x86_64)
-        deps: [clean]
+        deps: [clean, lint]
         cmds:
             - rm -rf ./build
             - mkdir -p ./build
@@ -51,14 +81,14 @@ tasks:
                   -derivedDataPath ./build \
                   -destination "platform=macOS,arch=arm64" \
                   -archivePath ./build/{{.APP_NAME}}-arm64.xcarchive \
-                  archive
+                  archive | xcbeautify
             - |
                 xcodebuild -scheme {{.SCHEME}} \
                   -configuration Release \
                   -derivedDataPath ./build \
                   -destination "platform=macOS,arch=x86_64" \
                   -archivePath ./build/{{.APP_NAME}}-x86_64.xcarchive \
-                  archive
+                  archive | xcbeautify
             - |
                 xcodebuild -create-xcframework \
                   -framework ./build/{{.APP_NAME}}-arm64.xcarchive/Products/Applications/{{.APP_NAME}}.app \
@@ -78,6 +108,15 @@ tasks:
             - echo "Exported {{.APP_NAME}}.app to ./release/"
         generates:
             - ./release/{{.APP_NAME}}.app
+
+    test:
+        desc: Run unit and UI tests
+        cmds:
+            - xcodebuild test -scheme {{.SCHEME}} -destination "platform=macOS" | xcbeautify
+
+    ci:
+        desc: Full CI pipeline (lint, format-check, build, test)
+        deps: [lint, format-check, build, test]
 
     create-dmg:
         desc: Create DMG distribution package

@@ -19,7 +19,7 @@ struct OpenRouterCreditMenuBarApp: App {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     var statusItem: NSStatusItem?
     var popover: NSPopover?
     @Published var creditManager = OpenRouterCreditManager()
@@ -57,6 +57,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 .environmentObject(creditManager)
         )
         popover?.behavior = .transient
+        popover?.delegate = self
 
         // .transient không đóng đáng tin cậy với app accessory,
         // nên thêm event monitor để tự đóng khi click ra ngoài
@@ -154,5 +155,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             statusItem?.button?.title = "Error"
         }
+    }
+
+    // MARK: - NSPopoverDelegate
+
+    func popoverDidShow(_ notification: Notification) {
+        creditManager.pauseMonitoring()
+        print("[OpenRouter] Popover shown - auto refresh paused")
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        creditManager.resumeMonitoring()
+        print("[OpenRouter] Popover closed - auto refresh resumed")
     }
 }
