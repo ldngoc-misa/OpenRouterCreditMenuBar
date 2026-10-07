@@ -643,30 +643,38 @@ struct TopModelsBlock: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                 } else {
-                    HStack(alignment: .top, spacing: 16) {
-                        ModelColumn(
-                            title: "Paid",
-                            models: paidModels,
-                            sortMode: creditManager.paidModelsSortMode,
-                            onTokensClick: { creditManager.paidModelsSortMode = .tokensDesc },
-                            onPriceClick: {
-                                // Cycle: tokensDesc -> priceAsc -> priceDesc -> tokensDesc
-                                switch creditManager.paidModelsSortMode {
-                                case .tokensDesc: creditManager.paidModelsSortMode = .priceAsc
-                                case .priceAsc: creditManager.paidModelsSortMode = .priceDesc
-                                case .priceDesc: creditManager.paidModelsSortMode = .tokensDesc
+                    GeometryReader { geometry in
+                        let totalWidth = geometry.size.width
+                        let paidWidth = totalWidth * 0.55 - 8  // 55% minus half spacing
+                        let freeWidth = totalWidth * 0.45 - 8  // 45% minus half spacing
+                        
+                        HStack(alignment: .top, spacing: 16) {
+                            ModelColumn(
+                                title: "Paid",
+                                models: paidModels,
+                                sortMode: creditManager.paidModelsSortMode,
+                                onTokensClick: { creditManager.paidModelsSortMode = .tokensDesc },
+                                onPriceClick: {
+                                    // Cycle: tokensDesc -> priceAsc -> priceDesc -> tokensDesc
+                                    switch creditManager.paidModelsSortMode {
+                                    case .tokensDesc: creditManager.paidModelsSortMode = .priceAsc
+                                    case .priceAsc: creditManager.paidModelsSortMode = .priceDesc
+                                    case .priceDesc: creditManager.paidModelsSortMode = .tokensDesc
+                                    }
                                 }
-                            }
-                        )
-                        ModelColumn(
-                            title: "Free",
-                            models: freeModels,
-                            sortMode: .tokensDesc, // Free models always sorted by tokens
-                            onTokensClick: {}, // No-op for free
-                            onPriceClick: {} // No-op for free
-                        )
+                            )
+                            .frame(width: paidWidth)
+                            
+                            ModelColumn(
+                                title: "Free",
+                                models: freeModels,
+                                sortMode: .tokensDesc, // Free models always sorted by tokens
+                                onTokensClick: {}, // No-op for free
+                                onPriceClick: {} // No-op for free
+                            )
+                            .frame(width: freeWidth)
+                        }
                     }
-                    .frame(maxWidth: .infinity, alignment: .top)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

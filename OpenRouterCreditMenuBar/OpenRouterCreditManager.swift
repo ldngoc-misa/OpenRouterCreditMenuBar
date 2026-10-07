@@ -1545,7 +1545,7 @@ class OpenRouterCreditManager: ObservableObject {
 
                 return TopModel(
                     modelPermaslug: permaslug,
-                    slug: model.slug,
+                    slug: isFree ? "\(model.slug):free" : model.slug,
                     displayName: model.short_name ?? model.name,
                     totalTokens: totalTokens,
                     isFree: isFree,
@@ -1636,7 +1636,7 @@ class OpenRouterCreditManager: ObservableObject {
 
                 return TopModel(
                     modelPermaslug: permaslug,
-                    slug: model.slug,
+                    slug: "\(model.slug):free",
                     displayName: model.short_name ?? model.name,
                     totalTokens: totalTokens,
                     isFree: true,
