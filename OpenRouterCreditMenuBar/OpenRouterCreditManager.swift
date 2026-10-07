@@ -1418,45 +1418,38 @@ class OpenRouterCreditManager: ObservableObject {
         let priceFilter = topModelsPriceFilter
         let sortMode = isFree ? PaidModelSortMode.tokensDesc : paidModelsSortMode // Free models always sorted by tokens
 
-        let filtered = models.filter { model in
-            // Search filter (applies to both name and slug)
-            let matchesSearch = searchText.isEmpty ||
-                model.displayName.localizedCaseInsensitiveContains(searchText) ||
-                model.slug.localizedCaseInsensitiveContains(searchText)
+        // Apply search filter first
+        let searchFiltered = models.filter { model in
+            searchText.isEmpty ||
+            model.displayName.localizedCaseInsensitiveContains(searchText) ||
+            model.slug.localizedCaseInsensitiveContains(searchText)
+        }
 
-            // Price filter (only for paid models)
-            let matchesPrice: Bool
-            if isFree {
-                matchesPrice = true // Free models don't have price filter
-            } else if let maxPrice = priceFilter.maxPrice,
-                      let outputPriceStr = model.outputPrice,
-                      let outputPrice = Double(outputPriceStr) {
-                let pricePerMillion = outputPrice * 1_000_000
-                matchesPrice = pricePerMillion <= maxPrice
-            } else {
-                matchesPrice = true // Unlimited or no price data
-            }
-
-            return matchesSearch && matchesPrice
+        // Apply price filter (only for paid models)
+        let priceFiltered = searchFiltered.filter { model in
+            if isFree { return true }
+            guard let maxPrice = priceFilter.maxPrice,
+                  let outputPriceStr = model.outputPrice,
+                  let outputPrice = Double(outputPriceStr) else { return true }
+            let pricePerMillion = outputPrice * 1_000_000
+            return pricePerMillion <= maxPrice
         }
 
         // Apply sorting
         let sorted: [TopModel]
         switch sortMode {
         case .tokensDesc:
-            sorted = filtered.sorted { $0.totalTokens > $1.totalTokens }
-        case .priceDesc:
-            sorted = filtered.sorted { model1, model2 in
+            // Sort all by tokens descending, take top 15
+            sorted = priceFiltered.sorted { $0.totalTokens > $1.totalTokens }
+        case .priceDesc, .priceAsc:
+            // When sorting by price: first take top 100 by tokens, then sort by price
+            let top100ByTokens = priceFiltered.sorted { $0.totalTokens > $1.totalTokens }.prefix(100)
+            let priceSorted = top100ByTokens.sorted { model1, model2 in
                 let price1 = (Double(model1.outputPrice ?? "0") ?? 0) * 1_000_000
                 let price2 = (Double(model2.outputPrice ?? "0") ?? 0) * 1_000_000
-                return price1 > price2
+                return sortMode == .priceDesc ? price1 > price2 : price1 < price2
             }
-        case .priceAsc:
-            sorted = filtered.sorted { model1, model2 in
-                let price1 = (Double(model1.outputPrice ?? "0") ?? 0) * 1_000_000
-                let price2 = (Double(model2.outputPrice ?? "0") ?? 0) * 1_000_000
-                return price1 < price2
-            }
+            sorted = Array(priceSorted)
         }
 
         // Return top 15 after filtering and sorting
