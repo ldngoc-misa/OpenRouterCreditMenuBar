@@ -4,6 +4,38 @@
 import SwiftUI
 import AppKit
 
+// NSScrollView subclass that always uses overlay scrollers: the bar is drawn
+// on top of the content, auto-hides, and never reserves width.
+// AppKit re-reads the system "Show scroll bars" preference on its first tile,
+// which can bring back a wide legacy scroller that steals width from the
+// model list until the next layout pass — so the style is re-applied on every
+// layout and whenever the view enters a window.
+final class OverlayScrollerScrollView: NSScrollView {
+    override var scrollerStyle: NSScroller.Style {
+        get { .overlay }
+        set { super.scrollerStyle = .overlay }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else { return }
+        enforceOverlayStyle()
+    }
+
+    override func layout() {
+        super.layout()
+        enforceOverlayStyle()
+    }
+
+    private func enforceOverlayStyle() {
+        // Guarded so setting the style (which triggers tiling) can't recurse.
+        if super.scrollerStyle != .overlay {
+            super.scrollerStyle = .overlay
+        }
+        if !autohidesScrollers { autohidesScrollers = true }
+    }
+}
+
 // Overlay scroll view using NSScrollView with overlay scroller style
 // Scrollbar appears on hover as semi-transparent overlay, no layout shift
 struct OverlayScrollView<Content: View>: NSViewRepresentable {
@@ -14,7 +46,7 @@ struct OverlayScrollView<Content: View>: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
+        let scrollView = OverlayScrollerScrollView()
         scrollView.scrollerStyle = .overlay
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
@@ -381,6 +413,7 @@ struct ModelColumn: View {
                     // Column headers
                     ModelColumnHeader(
                         isFree: models.first?.isFree ?? false,
+                        categoryColor: isPaidColumn ? Color.orange : Color.green,
                         sortMode: sortMode,
                         onTokensClick: onTokensClick,
                         onPriceClick: onPriceClick
@@ -403,9 +436,16 @@ struct ModelColumn: View {
 // Column header row
 struct ModelColumnHeader: View {
     let isFree: Bool
+    let categoryColor: Color
     let sortMode: PaidModelSortMode
     let onTokensClick: () -> Void
     let onPriceClick: () -> Void
+
+    // Darker version of category color for headers
+    private var headerColor: Color {
+        // Use a slightly darker, more saturated version for better visibility
+        isFree ? Color.green.opacity(0.85) : Color.orange.opacity(0.85)
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -419,7 +459,7 @@ struct ModelColumnHeader: View {
                 Text("Model")
                     .font(.caption2)
                     .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(headerColor)
                     .lineLimit(1)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -427,25 +467,25 @@ struct ModelColumnHeader: View {
             // Spacer to push other headers to the right
             Spacer(minLength: 0)
 
-            // Tokens header - clickable for paid models
+            // Tokens header - clickable for paid models, non-clickable for free models
             Button(action: onTokensClick) {
                 HStack(spacing: 2) {
                     Text("Tokens")
                         .font(.caption2)
                         .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(headerColor)
                     // Sort indicator for tokens
                     if sortMode == .tokensDesc {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 8, weight: .medium))
-                            .foregroundColor(.secondary.opacity(0.6))
+                            .foregroundColor(headerColor.opacity(0.6))
                     }
                 }
                 .frame(width: 50, alignment: .trailing)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(isFree) // Only paid models can sort by tokens (it's the default anyway)
+            // For free models, make button non-interactive but keep same styling (no disabled gray)
 
             // Price header - clickable for paid models (cycles through price desc/asc)
             if !isFree {
@@ -454,16 +494,16 @@ struct ModelColumnHeader: View {
                         Text("Price")
                             .font(.caption2)
                             .fontWeight(.semibold)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(headerColor)
                         // Sort indicator for price
                         if sortMode == .priceDesc {
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 8, weight: .medium))
-                                .foregroundColor(.secondary.opacity(0.6))
+                                .foregroundColor(headerColor.opacity(0.6))
                         } else if sortMode == .priceAsc {
                             Image(systemName: "chevron.up")
                                 .font(.system(size: 8, weight: .medium))
-                                .foregroundColor(.secondary.opacity(0.6))
+                                .foregroundColor(headerColor.opacity(0.6))
                         }
                     }
                     .frame(width: 80, alignment: .trailing)
@@ -476,7 +516,7 @@ struct ModelColumnHeader: View {
             Text("Ctx")
                 .font(.caption2)
                 .fontWeight(.semibold)
-                .foregroundColor(.secondary)
+                .foregroundColor(headerColor)
                 .frame(width: 35, alignment: .trailing)
         }
         .padding(.vertical, 2)
