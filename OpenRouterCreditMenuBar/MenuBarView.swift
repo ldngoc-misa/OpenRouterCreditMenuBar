@@ -340,12 +340,35 @@ struct ModelColumn: View {
     let onTokensClick: () -> Void
     let onPriceClick: () -> Void
 
+    // Determine if this is the "Paid" or "Free" column for styling
+    private var isPaidColumn: Bool {
+        title.lowercased() == "paid"
+    }
+
+    private var categoryColor: Color {
+        isPaidColumn ? Color.orange : Color.green
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            // Category label - styled as a badge/pill to clearly distinguish from column headers
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(categoryColor)
+                    .frame(width: 6, height: 6)
+                Text(title.uppercased())
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundColor(categoryColor)
+                    .textCase(.uppercase)
+                // Subtle separator line extending to the right
+                Rectangle()
+                    .fill(categoryColor.opacity(0.3))
+                    .frame(height: 1)
+                    .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, 2)
+            .padding(.vertical, 2)
 
             if models.isEmpty {
                 Text("No data")
