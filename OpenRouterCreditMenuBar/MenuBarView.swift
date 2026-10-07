@@ -2,6 +2,46 @@
 //  OpenRouterCreditMenuBar
 
 import SwiftUI
+import AppKit
+
+// Overlay scroll view using NSScrollView with overlay scroller style
+// Scrollbar appears on hover as semi-transparent overlay, no layout shift
+struct OverlayScrollView<Content: View>: NSViewRepresentable {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.scrollerStyle = .overlay
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+        scrollView.backgroundColor = .clear
+
+        let hostingView = NSHostingView(rootView: content)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+
+        scrollView.documentView = hostingView
+
+        // Constrain document view width to scroll view width
+        NSLayoutConstraint.activate([
+            hostingView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor)
+        ])
+
+        return scrollView
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        if let hostingView = nsView.documentView as? NSHostingView<Content> {
+            hostingView.rootView = content
+            hostingView.layoutSubtreeIfNeeded()
+        }
+    }
+}
 
 // Custom toolbar button with hover effect
 struct ToolbarButton: View {
@@ -323,7 +363,7 @@ struct ModelColumn: View {
                         onPriceClick: onPriceClick
                     )
 
-                    ScrollView {
+                    OverlayScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(models) { model in
                                 ModelListRow(model: model)
