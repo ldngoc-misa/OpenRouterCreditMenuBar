@@ -538,7 +538,7 @@ struct TopModelsBlock: View {
                         .textFieldStyle(.plain)
                         .font(.caption2)
                         .frame(width: 140)
-                        .padding(.vertical, 2)
+                        .padding(.vertical, 5)
                         .padding(.horizontal, 6)
                         .background(
                             RoundedRectangle(cornerRadius: 4)
