@@ -805,6 +805,12 @@ struct MenuBarView: View {
                     action: {
                         Task {
                             await creditManager.fetchCredit()
+                            await MainActor.run {
+                                // Update menubar title after fetch
+                                if let appDelegate = NSApp.delegate as? AppDelegate {
+                                    appDelegate.updateMenuBarTitle()
+                                }
+                            }
                         }
                     },
                     isLoading: creditManager.isLoading

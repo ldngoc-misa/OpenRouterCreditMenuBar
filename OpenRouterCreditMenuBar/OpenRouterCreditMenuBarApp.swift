@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 @main
 struct OpenRouterCreditMenuBarApp: App {
@@ -31,6 +32,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     // Popover width must match MenuBarView's frame width so the
     // centered anchor rect aligns properly.
     private let popoverWidth: CGFloat = 240
+    
+    // Loading animation timer
+    private var loadingTimer: Timer?
+    private var loadingFrame = 0
+    // Smooth spinner frames - similar to ProgressView spinner
+    private let loadingFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    
+    // Track if we're currently showing loading state
+    private var isShowingLoading = false
+    
+    // Combine cancellable for observing isLoading changes
+    private var loadingCancellable: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // ซ่อน dock icon แต่ยังคงให้ app สามารถแสดง window ได่
@@ -62,6 +75,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // .transient không đóng đáng tin cậy với app accessory,
         // nên thêm event monitor để tự đóng khi click ra ngoài
         setupOutsideClickDismissal()
+
+        // Observe isLoading changes to show/hide loading animation on menubar
+        loadingCancellable = creditManager.$isLoading
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLoading in
+                self?.updateMenuBarTitleForLoading(isLoading)
+            }
 
         // เริ่ม fetch credit
         Task {
@@ -147,14 +167,54 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         if let localEventMonitor { NSEvent.removeMonitor(localEventMonitor) }
         if let globalEventMonitor { NSEvent.removeMonitor(globalEventMonitor) }
+        loadingTimer?.invalidate()
+        loadingTimer = nil
     }
 
     func updateMenuBarTitle() {
+        // Called after fetch completes - shows final credit value
+        stopLoadingAnimation()
         if let credit = creditManager.currentCredit {
             statusItem?.button?.title = "$\(String(format: "%.2f", credit))"
         } else {
             statusItem?.button?.title = "Error"
         }
+    }
+    
+    private func updateMenuBarTitleForLoading(_ isLoading: Bool) {
+        // Called when isLoading changes - handles loading animation
+        if isLoading {
+            startLoadingAnimation()
+        } else {
+            // Loading finished - stop animation and show credit
+            stopLoadingAnimation()
+            if let credit = creditManager.currentCredit {
+                statusItem?.button?.title = "$\(String(format: "%.2f", credit))"
+            } else {
+                statusItem?.button?.title = "Error"
+            }
+        }
+    }
+    
+    private func startLoadingAnimation() {
+        guard !isShowingLoading else { return }
+        isShowingLoading = true
+        loadingFrame = 0
+        
+        // Initial frame - use smooth spinner frames
+        statusItem?.button?.title = loadingFrames[0]
+        
+        loadingTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.loadingFrame = (self.loadingFrame + 1) % self.loadingFrames.count
+            self.statusItem?.button?.title = self.loadingFrames[self.loadingFrame]
+        }
+    }
+    
+    private func stopLoadingAnimation() {
+        loadingTimer?.invalidate()
+        loadingTimer = nil
+        isShowingLoading = false
     }
 
     // MARK: - NSPopoverDelegate
