@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		2168F44E30773F2D000A0BAC /* openrouter-icon-tran.png in Resources */ = {isa = PBXBuildFile; fileRef = 2168F44C30773F2D000A0BAC /* openrouter-icon-tran.png */; };
+		2168F44F30773F2D000A0BAC /* openrouter-icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 2168F44B30773F2D000A0BAC /* openrouter-icon.png */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		3AB0A12D2DE1C330000AA503 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,6 +29,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		2168F44B30773F2D000A0BAC /* openrouter-icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "openrouter-icon.png"; sourceTree = "<group>"; };
+		2168F44C30773F2D000A0BAC /* openrouter-icon-tran.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "openrouter-icon-tran.png"; sourceTree = "<group>"; };
 		3AB0A11E2DE1C32E000AA503 /* OpenRouterCreditMenuBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenRouterCreditMenuBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3AB0A12C2DE1C330000AA503 /* OpenRouterCreditMenuBarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenRouterCreditMenuBarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3AB0A1362DE1C330000AA503 /* OpenRouterCreditMenuBarUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenRouterCreditMenuBarUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -90,9 +97,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2168F44D30773F2D000A0BAC /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				2168F44B30773F2D000A0BAC /* openrouter-icon.png */,
+				2168F44C30773F2D000A0BAC /* openrouter-icon-tran.png */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		3AB0A1152DE1C32E000AA503 = {
 			isa = PBXGroup;
 			children = (
+				2168F44D30773F2D000A0BAC /* Resources */,
 				21B1007B306F4C5800FCB584 /* References */,
 				3AB0A1202DE1C32E000AA503 /* OpenRouterCreditMenuBar */,
 				3AB0A12F2DE1C330000AA503 /* OpenRouterCreditMenuBarTests */,
@@ -232,6 +249,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2168F44E30773F2D000A0BAC /* openrouter-icon-tran.png in Resources */,
+				2168F44F30773F2D000A0BAC /* openrouter-icon.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
