@@ -58,11 +58,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let statusButton = statusItem?.button {
+            // Set the menu bar icon (template image adapts to light/dark mode)
+            if let menuIcon = NSImage(named: "MenuBarIcon") {
+                menuIcon.isTemplate = true
+                statusButton.image = menuIcon
+                statusButton.imagePosition = .imageLeft
+            }
             statusButton.title = "Loading..."
             statusButton.action = #selector(showMenu)
             statusButton.target = self
             // Set minimum width to prevent UI jumping when switching between loading and credit display
-            statusItem?.length = 40
+            // +16px to accommodate the menu bar icon
+            statusItem?.length = 56
         }
 
         // สร้าง popover
