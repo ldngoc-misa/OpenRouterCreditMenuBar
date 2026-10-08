@@ -61,6 +61,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             statusButton.title = "Loading..."
             statusButton.action = #selector(showMenu)
             statusButton.target = self
+            // Set minimum width to prevent UI jumping when switching between loading and credit display
+            statusItem?.length = 40
         }
 
         // สร้าง popover
