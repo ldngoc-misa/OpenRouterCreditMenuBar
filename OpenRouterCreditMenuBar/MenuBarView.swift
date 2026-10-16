@@ -337,7 +337,8 @@ struct ModelListRow: View {
                     .font(.caption2)
                     .fontWeight(.medium)
                     .foregroundColor(.secondary)
-                    .frame(width: 80, alignment: .trailing)
+                    // Wider than other numeric columns so two prices stay readable
+                    .frame(width: 100, alignment: .trailing)
             }
 
             // Context Length
@@ -506,7 +507,7 @@ struct ModelColumnHeader: View {
                                 .foregroundColor(headerColor.opacity(0.6))
                         }
                     }
-                    .frame(width: 80, alignment: .trailing)
+                    .frame(width: 100, alignment: .trailing)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

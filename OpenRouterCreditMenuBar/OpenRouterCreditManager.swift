@@ -1542,6 +1542,18 @@ class OpenRouterCreditManager: ObservableObject {
         }
     }
 
+    /// Returns true when the model entry represents the `batch` variant.
+    /// The public API exposes batch as its own variant alongside `standard`/`free`, and the same
+    /// model can show up twice (once per variant) — the TOP MODELS list only wants the standard one.
+    private static func isBatchVariant(_ model: PublicAPIModel) -> Bool {
+        let variant = model.endpoint?.variant.lowercased() ?? ""
+        if variant == "batch" { return true }
+        let variantSlug = model.endpoint?.model_variant_slug.lowercased() ?? ""
+        if variantSlug.hasSuffix(":batch") { return true }
+        let variantPermaslug = model.endpoint?.model_variant_permaslug?.lowercased() ?? ""
+        return variantPermaslug.hasSuffix(":batch")
+    }
+
     /// Process PublicAPIResponse to extract TopModel array
     private func processPublicAPIModels(_ publicResponse: PublicAPIResponse, isFree: Bool) throws -> [TopModel] {
         // Build a lookup of analytics by model permaslug/variant
@@ -1554,6 +1566,9 @@ class OpenRouterCreditManager: ObservableObject {
 
         // Filter models based on free/paid
         let filteredModels = publicResponse.data.models.filter { model in
+            // Batch variants are a separate throughput tier (billed separately) and must not
+            // appear in the TOP MODELS list alongside the standard variant of the same model.
+            if Self.isBatchVariant(model) { return false }
             let modelIsFree = model.endpoint?.is_free == true || model.is_free == true
             return isFree ? modelIsFree : !modelIsFree
         }
@@ -1660,6 +1675,7 @@ class OpenRouterCreditManager: ObservableObject {
         // Models are already sorted by totalTokens descending from the API
         // Filtering and limiting to 15 will be done in applyFiltersAndLimit
         let freeModels = publicResponse.data.models
+            .filter { !Self.isBatchVariant($0) }
             .map { model in
                 let permaslug = model.permaslug ?? model.slug
                 // Match analytics by variant-specific key first, then fall back.
