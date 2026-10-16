@@ -178,6 +178,9 @@ struct PublicAPIAnalytics: Decodable {
         do {
             self.modelAnalytics = try container.decode([String: PublicAPIModelAnalytics].self)
         } catch {
+            // Log the real decoding error so a payload-shape change is visible in the console
+            // instead of silently surfacing as "N/A" for every model.
+            print("[OpenRouter] ERROR decoding analytics dictionary: \(error)")
             // If decoding fails, log the raw keys for debugging
             if let jsonDict = try? container.decode([String: JSONValue].self) {
                 print("[OpenRouter] Analytics raw keys: \(Array(jsonDict.keys).prefix(20))")
@@ -193,7 +196,11 @@ struct PublicAPIModelAnalytics: Decodable {
     let variant: String
     let variant_permaslug: String
     let count: Int
-    let total_usage: Double
+    /// NOTE: OpenRouter stopped returning `total_usage` in this payload (verified absent across
+    /// every entry), so it is optional. It is never read by the UI. Decoding it as a required
+    /// field previously failed the entire analytics dictionary, which surfaced as "N/A" for
+    /// every model's token count.
+    let total_usage: Double?
     let total_completion_tokens: Int
     let total_prompt_tokens: Int
     let total_native_tokens_reasoning: Int
@@ -210,6 +217,43 @@ struct PublicAPIModelAnalytics: Decodable {
     let requests_with_tool_call_errors: Int
     let total_byok_prompt_tokens: Int
     let total_byok_completion_tokens: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case date, model_permaslug, variant, variant_permaslug, count, total_usage
+        case total_completion_tokens, total_prompt_tokens, total_native_tokens_reasoning
+        case num_media_prompt, num_media_completion, image_output_requests, num_video_prompt
+        case video_output_seconds, rerank_documents, stt_transcript_characters, num_audio_prompt
+        case total_native_tokens_cached, total_tool_calls, requests_with_tool_call_errors
+        case total_byok_prompt_tokens, total_byok_completion_tokens
+    }
+
+    /// Tolerant decoding: a missing or type-mismatched field falls back to a default instead of
+    /// failing the whole payload. Only the token fields are used to compute `totalTokens`.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = (try? c.decode(String.self, forKey: .date)) ?? ""
+        model_permaslug = (try? c.decode(String.self, forKey: .model_permaslug)) ?? ""
+        variant = (try? c.decode(String.self, forKey: .variant)) ?? ""
+        variant_permaslug = (try? c.decode(String.self, forKey: .variant_permaslug)) ?? ""
+        count = (try? c.decode(Int.self, forKey: .count)) ?? 0
+        total_usage = try? c.decode(Double.self, forKey: .total_usage)
+        total_completion_tokens = (try? c.decode(Int.self, forKey: .total_completion_tokens)) ?? 0
+        total_prompt_tokens = (try? c.decode(Int.self, forKey: .total_prompt_tokens)) ?? 0
+        total_native_tokens_reasoning = (try? c.decode(Int.self, forKey: .total_native_tokens_reasoning)) ?? 0
+        num_media_prompt = (try? c.decode(Int.self, forKey: .num_media_prompt)) ?? 0
+        num_media_completion = (try? c.decode(Int.self, forKey: .num_media_completion)) ?? 0
+        image_output_requests = (try? c.decode(Int.self, forKey: .image_output_requests)) ?? 0
+        num_video_prompt = (try? c.decode(Int.self, forKey: .num_video_prompt)) ?? 0
+        video_output_seconds = (try? c.decode(Double.self, forKey: .video_output_seconds)) ?? 0
+        rerank_documents = (try? c.decode(Int.self, forKey: .rerank_documents)) ?? 0
+        stt_transcript_characters = (try? c.decode(Int.self, forKey: .stt_transcript_characters)) ?? 0
+        num_audio_prompt = (try? c.decode(Int.self, forKey: .num_audio_prompt)) ?? 0
+        total_native_tokens_cached = (try? c.decode(Int.self, forKey: .total_native_tokens_cached)) ?? 0
+        total_tool_calls = (try? c.decode(Int.self, forKey: .total_tool_calls)) ?? 0
+        requests_with_tool_call_errors = (try? c.decode(Int.self, forKey: .requests_with_tool_call_errors)) ?? 0
+        total_byok_prompt_tokens = (try? c.decode(Int.self, forKey: .total_byok_prompt_tokens)) ?? 0
+        total_byok_completion_tokens = (try? c.decode(Int.self, forKey: .total_byok_completion_tokens)) ?? 0
+    }
     
     /// Total tokens = prompt + completion + reasoning
     var totalTokens: Int {
@@ -1519,11 +1563,19 @@ class OpenRouterCreditManager: ObservableObject {
         let models = filteredModels
             .map { model in
                 let permaslug = model.permaslug ?? model.slug
-                // Try multiple key formats to match analytics
+                // Match analytics by variant-specific key first, then fall back.
+                // The public API keys analytics by variant: the standard variant uses the plain
+                // permaslug ("deepseek/deepseek-v4.1-flash-20260910") while non-standard variants
+                // append ":" + variant ("...:free", "...:batch"). `model_variant_permaslug` already
+                // equals that key, so it must be tried BEFORE the plain permaslug: for a free model
+                // both keys can exist and the plain one holds the *paid* variant's tokens.
+                let variant = model.endpoint?.variant ?? "standard"
                 let possibleKeys = [
+                    model.endpoint?.model_variant_permaslug ?? "",
+                    "\(permaslug):\(variant)",
+                    permaslug,
                     "\(permaslug)/standard",
                     "\(permaslug)/free",
-                    model.endpoint?.model_variant_permaslug ?? "",
                     model.endpoint?.model_variant_slug ?? ""
                 ].filter { !$0.isEmpty }
 
@@ -1610,11 +1662,18 @@ class OpenRouterCreditManager: ObservableObject {
         let freeModels = publicResponse.data.models
             .map { model in
                 let permaslug = model.permaslug ?? model.slug
-                // Try multiple key formats to match analytics
+                // Match analytics by variant-specific key first, then fall back.
+                // The public API keys analytics by variant: the standard variant uses the plain
+                // permaslug while non-standard variants append ":" + variant ("...:free", "...:batch").
+                // Free models in particular can have BOTH keys present in the same response, and the
+                // plain one holds the *paid* variant's tokens — so the ":free" key must win.
+                let variant = model.endpoint?.variant ?? "free"
                 let possibleKeys = [
+                    model.endpoint?.model_variant_permaslug ?? "",
+                    "\(permaslug):\(variant)",
+                    permaslug,
                     "\(permaslug)/free",
                     "\(permaslug)/standard",
-                    model.endpoint?.model_variant_permaslug ?? "",
                     model.endpoint?.model_variant_slug ?? ""
                 ].filter { !$0.isEmpty }
 
