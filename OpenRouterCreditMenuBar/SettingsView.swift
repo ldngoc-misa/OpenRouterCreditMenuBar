@@ -54,7 +54,11 @@ struct SettingsView: View {
                 }
             }
 
-            Section("API Configuration") {
+            Section("OpenRouter") {
+                Text("Credit balance, spend, requests, tokens, and model activity")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
                 SecureField("OpenRouter API Key", text: $apiKey)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: apiKey) { _, newValue in
@@ -73,6 +77,22 @@ struct SettingsView: View {
                             .scaleEffect(0.5)
                     }
                 }
+            }
+
+            Section("OpenAI") {
+                LabeledContent("ChatGPT", value: "Not connected")
+                LabeledContent("API usage", value: "Not connected")
+                Text("ChatGPT account and API usage connections will be configured here.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section("Antigravity") {
+                LabeledContent("Account", value: "Not connected")
+                LabeledContent("Quota monitoring", value: "Not connected")
+                Text("Antigravity account and quota connection will be configured here.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             if let error = creditManager.errorMessage {

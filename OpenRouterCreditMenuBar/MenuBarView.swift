@@ -146,7 +146,7 @@ struct SpendTodayPopover: View {
                             .foregroundColor(.secondary)
                     }
                 }
-                
+
                 if modelSpending.count > 10 {
                     Text("... and \(modelSpending.count - 10) more")
                         .font(.caption2)
@@ -394,14 +394,10 @@ struct ModelColumn: View {
                     .fontWeight(.bold)
                     .foregroundColor(categoryColor)
                     .textCase(.uppercase)
-                // Subtle separator line extending to the right
-                Rectangle()
-                    .fill(categoryColor.opacity(0.3))
-                    .frame(height: 1)
-                    .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 2)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(categoryColor.opacity(0.1), in: Capsule())
 
             if models.isEmpty {
                 Text("No data")
@@ -570,6 +566,9 @@ struct MetricBlock: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(height: blockHeight, alignment: .top)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -681,11 +680,30 @@ struct TopModelsBlock: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(height: blockHeight, alignment: .top)
+        .padding(14)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
 struct MenuBarView: View {
     @EnvironmentObject var creditManager: OpenRouterCreditManager
+    @State private var selectedProvider: ProviderTab = .openRouter
+
+    private enum ProviderTab: String, CaseIterable, Identifiable {
+        case openRouter = "OpenRouter"
+        case openAI = "OpenAI"
+        case antigravity = "Antigravity"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .openRouter: "point.3.connected.trianglepath.dotted"
+            case .openAI: "sparkle"
+            case .antigravity: "arrow.up.right.and.arrow.down.left"
+            }
+        }
+    }
 
     /// Label showing which day the "Spend" value refers to.
     /// Days are compared in UTC to stay consistent with the API's UTC-based data.
@@ -789,63 +807,9 @@ struct MenuBarView: View {
         }
     }
     
-    var body: some View {
-        VStack(spacing: 2) {  // Reduced from 8 to 2
-            // MARK: - Line 1: Title Bar with buttons (reduced height)
-            HStack(spacing: 6) {
-                Image(systemName: "creditcard")
-                    .foregroundColor(.blue)
-                    .font(.system(size: 14))
-                Text("OpenRouter Credit")
-                    .font(.system(size: 13, weight: .medium))
-                Spacer()
-                
-                ToolbarButton(
-                    systemName: "arrow.clockwise",
-                    tooltip: "Refresh",
-                    action: {
-                        Task {
-                            await creditManager.fetchCredit()
-                            await MainActor.run {
-                                // Update menubar title after fetch
-                                if let appDelegate = NSApp.delegate as? AppDelegate {
-                                    appDelegate.updateMenuBarTitle()
-                                }
-                            }
-                        }
-                    },
-                    isLoading: creditManager.isLoading
-                )
-                
-                ToolbarButton(
-                    systemName: "globe",
-                    tooltip: "View Activity"
-                ) {
-                    if let url = URL(string: "https://openrouter.ai/activity") {
-                        NSWorkspace.shared.open(url)
-                    }
-                }
-                
-                SettingsLink {
-                    SettingsToolbarButton(systemName: "gearshape")
-                }
-                .buttonStyle(.plain)
-                .help("Settings")
-                
-                ToolbarButton(
-                    systemName: "power",
-                    tooltip: "Quit"
-                ) {
-                    NSApplication.shared.terminate(nil)
-                }
-            }
-            .padding(.vertical, 2)  // Reduced from 4 to 2
-            
-            // Separator after title bar
-            Divider()
-                .padding(.bottom, 15)
-
-            // MARK: - Line 2: Credit | Requests | Tokens - FIXED HEIGHT (300px for 15 items)
+    private var openRouterDashboard: some View {
+        VStack(spacing: 14) {
+            // Credit | Requests | Tokens
             HStack(alignment: .top, spacing: 12) {
                 MetricBlock(
                     title: "CREDIT",
@@ -854,20 +818,12 @@ struct MenuBarView: View {
                     content: AnyView(creditContent)
                 )
 
-                Divider()
-                    .frame(height: 56)
-                    .frame(maxHeight: .infinity, alignment: .top)
-
                 MetricBlock(
                     title: "REQUESTS",
                     isLoading: creditManager.isLoading,
                     errorMessage: creditManager.requestsErrorMessage,
                     content: AnyView(requestsContent)
                 )
-
-                Divider()
-                    .frame(height: 56)
-                    .frame(maxHeight: .infinity, alignment: .top)
 
                 MetricBlock(
                     title: "TOKENS",
@@ -877,12 +833,7 @@ struct MenuBarView: View {
                 )
             }
             .frame(maxWidth: .infinity, alignment: .top)
-            
-            // Separator before Top Models
-            Divider()
-                .padding(.bottom, 15)
 
-            // MARK: - Line 3: Top Models (Full Width) - FIXED HEIGHT (300px with scroll)
             TopModelsBlock(
                 isLoading: creditManager.isLoading,
                 errorMessage: creditManager.topModelsErrorMessage,
@@ -891,11 +842,268 @@ struct MenuBarView: View {
                 creditManager: creditManager
             )
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            
+        }
+    }
+
+    @ViewBuilder
+    private var selectedProviderContent: some View {
+        switch selectedProvider {
+        case .openRouter:
+            openRouterDashboard
+        case .openAI:
+            OpenAIProviderView()
+        case .antigravity:
+            AntigravityProviderView()
+        }
+    }
+
+    private var providerTabs: some View {
+        HStack(spacing: 6) {
+            ForEach(ProviderTab.allCases) { tab in
+                Button {
+                    selectedProvider = tab
+                } label: {
+                    Label(tab.rawValue, systemImage: tab.icon)
+                        .font(.system(size: 12, weight: selectedProvider == tab ? .semibold : .medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background {
+                            RoundedRectangle(cornerRadius: 7)
+                                .fill(selectedProvider == tab ? Color.accentColor.opacity(0.2) : .clear)
+                        }
+                        .foregroundStyle(selectedProvider == tab ? Color.accentColor : Color.secondary)
+                        .contentShape(RoundedRectangle(cornerRadius: 7))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selectedProvider == tab ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 9))
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            // Shared title bar
+            HStack(spacing: 6) {
+                Image(systemName: "square.stack.3d.up")
+                    .foregroundStyle(Color.accentColor)
+                    .font(.system(size: 14))
+                Text("AI Provider Monitor")
+                    .font(.system(size: 13, weight: .medium))
+                Spacer()
+
+                if selectedProvider == .openRouter {
+                    ToolbarButton(
+                        systemName: "arrow.clockwise",
+                        tooltip: "Refresh OpenRouter",
+                        action: {
+                            Task {
+                                await creditManager.fetchCredit()
+                                await MainActor.run {
+                                    if let appDelegate = NSApp.delegate as? AppDelegate {
+                                        appDelegate.updateMenuBarTitle()
+                                    }
+                                }
+                            }
+                        },
+                        isLoading: creditManager.isLoading
+                    )
+
+                    ToolbarButton(
+                        systemName: "globe",
+                        tooltip: "View OpenRouter Activity"
+                    ) {
+                        if let url = URL(string: "https://openrouter.ai/activity") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                }
+
+                SettingsLink {
+                    SettingsToolbarButton(systemName: "gearshape")
+                }
+                .buttonStyle(.plain)
+                .help("Settings")
+
+                ToolbarButton(
+                    systemName: "power",
+                    tooltip: "Quit"
+                ) {
+                    NSApplication.shared.terminate(nil)
+                }
+            }
+            .padding(.vertical, 2)
+
+            providerTabs
+
+            Divider()
+
+            selectedProviderContent
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 4)  // Reduced from 6 to 4
+        .padding(.vertical, 8)
         .frame(width: 720)
+    }
+}
+
+private struct OpenAIProviderView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("OpenAI")
+                        .font(.title2.weight(.semibold))
+                    Text("ChatGPT subscription and API usage")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Label("Not connected", systemImage: "circle.dashed")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("CHATGPT", systemImage: "bubble.left.and.bubble.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("Plan and limits")
+                        .font(.headline)
+                    ProviderValueRow(title: "Subscription", value: "Not connected")
+                    ProviderValueRow(title: "Usage", value: "Unavailable")
+                    ProviderValueRow(title: "Limit reset", value: "Unavailable")
+                    Spacer(minLength: 0)
+                    Label("ChatGPT account data", systemImage: "person.crop.circle")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
+                .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("API", systemImage: "terminal")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Cost")
+                            .font(.headline)
+                        Spacer()
+                        Text("Unavailable")
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    Divider()
+                    ProviderValueRow(title: "Tokens", value: "Unavailable")
+                    ProviderValueRow(title: "Requests", value: "Unavailable")
+                    ProviderValueRow(title: "Budget", value: "Not configured")
+                    Spacer(minLength: 0)
+                    Label("API organization usage", systemImage: "chart.bar")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
+                .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
+            }
+
+            Label("Connect OpenAI in Settings to show account and usage details.", systemImage: "info.circle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+private struct AntigravityProviderView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Antigravity")
+                        .font(.title2.weight(.semibold))
+                    Text("Quota and usage")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Label("Not connected", systemImage: "circle.dashed")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("AVAILABLE QUOTA")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("—")
+                        .font(.system(size: 38, weight: .semibold, design: .rounded))
+                    Text("Connect an account to view quota")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    ProgressView(value: 0)
+                        .tint(.purple)
+                    HStack {
+                        Label("Usage", systemImage: "chart.bar.fill")
+                        Spacer()
+                        Text("Unavailable")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(18)
+                .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
+                .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+
+                VStack(alignment: .leading, spacing: 14) {
+                    Label("RESET SCHEDULE", systemImage: "clock.arrow.circlepath")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("Next reset")
+                        .font(.headline)
+                    Text("Unavailable")
+                        .font(.title3.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Divider()
+                    Text("Account")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Not connected")
+                        .font(.subheadline)
+                    Spacer(minLength: 0)
+                    Label("Antigravity quota details", systemImage: "sparkles")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(18)
+                .frame(minWidth: 230, maxWidth: 230, minHeight: 230, alignment: .topLeading)
+                .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 14))
+            }
+
+            Label("Connect Antigravity in Settings to show quota and reset information.", systemImage: "info.circle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+private struct ProviderValueRow: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .foregroundStyle(.primary)
+        }
+        .font(.caption)
     }
 }
 
