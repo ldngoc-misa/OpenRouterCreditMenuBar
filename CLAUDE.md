@@ -27,6 +27,9 @@ task release              # Full release pipeline (build + GitHub release)
 task clean                # Clean all build artifacts
 task check-deps           # Verify required dependencies (gh CLI)
 task debug-info           # Show Xcode version, schemes, destinations
+
+#Run app
+open ./build/Build/Products/Release/OpenRouterCreditMenuBar.app
 ```
 
 ### Build & Run (via Xcode)
