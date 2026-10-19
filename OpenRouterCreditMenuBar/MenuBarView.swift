@@ -367,38 +367,13 @@ struct ModelListRow: View {
 
 // Scrollable model column with header
 struct ModelColumn: View {
-    let title: String
     let models: [TopModel]
     let sortMode: PaidModelSortMode
     let onTokensClick: () -> Void
     let onPriceClick: () -> Void
 
-    // Determine if this is the "Paid" or "Free" column for styling
-    private var isPaidColumn: Bool {
-        title.lowercased() == "paid"
-    }
-
-    private var categoryColor: Color {
-        isPaidColumn ? Color.orange : Color.green
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Category label - styled as a badge/pill to clearly distinguish from column headers
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(categoryColor)
-                    .frame(width: 6, height: 6)
-                Text(title.uppercased())
-                    .font(.caption2)
-                    .fontWeight(.bold)
-                    .foregroundColor(categoryColor)
-                    .textCase(.uppercase)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(categoryColor.opacity(0.1), in: Capsule())
-
             if models.isEmpty {
                 Text("No data")
                     .font(.caption2)
@@ -410,7 +385,6 @@ struct ModelColumn: View {
                     // Column headers
                     ModelColumnHeader(
                         isFree: models.first?.isFree ?? false,
-                        categoryColor: isPaidColumn ? Color.orange : Color.green,
                         sortMode: sortMode,
                         onTokensClick: onTokensClick,
                         onPriceClick: onPriceClick
@@ -433,7 +407,6 @@ struct ModelColumn: View {
 // Column header row
 struct ModelColumnHeader: View {
     let isFree: Bool
-    let categoryColor: Color
     let sortMode: PaidModelSortMode
     let onTokensClick: () -> Void
     let onPriceClick: () -> Void
@@ -453,7 +426,7 @@ struct ModelColumnHeader: View {
                     .frame(width: 3, height: 12)
 
                 // Model header - starts at left edge (aligned with color indicator), overflows into model name column
-                Text("Model")
+                Text(isFree ? "Free Model" : "Paid Model")
                     .font(.caption2)
                     .fontWeight(.semibold)
                     .foregroundColor(headerColor)
@@ -650,7 +623,6 @@ struct TopModelsBlock: View {
                         
                         HStack(alignment: .top, spacing: 16) {
                             ModelColumn(
-                                title: "Paid",
                                 models: paidModels,
                                 sortMode: creditManager.paidModelsSortMode,
                                 onTokensClick: { creditManager.paidModelsSortMode = .tokensDesc },
@@ -666,7 +638,6 @@ struct TopModelsBlock: View {
                             .frame(width: paidWidth)
                             
                             ModelColumn(
-                                title: "Free",
                                 models: freeModels,
                                 sortMode: .tokensDesc, // Free models always sorted by tokens
                                 onTokensClick: {}, // No-op for free
