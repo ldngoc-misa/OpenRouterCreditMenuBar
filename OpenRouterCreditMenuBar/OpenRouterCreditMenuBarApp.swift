@@ -126,12 +126,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func keepPopoverOnScreen() {
         guard let popoverWindow = popover?.contentViewController?.view.window,
-              let screen = popoverWindow.screen ?? statusItem?.button?.window?.screen else { return }
+              let statusButton = statusItem?.button,
+              let buttonWindow = statusButton.window,
+              let screen = buttonWindow.screen ?? popoverWindow.screen else { return }
 
         let visibleFrame = screen.visibleFrame
         var frame = popoverWindow.frame
+        let buttonScreenFrame = buttonWindow.convertToScreen(
+            statusButton.convert(statusButton.bounds, to: nil)
+        )
+        let centeredLeft = buttonScreenFrame.midX - frame.width / 2
         let maximumLeft = max(visibleFrame.minX, visibleFrame.maxX - frame.width)
-        frame.origin.x = min(max(frame.minX, visibleFrame.minX), maximumLeft)
+        frame.origin.x = min(max(centeredLeft, visibleFrame.minX), maximumLeft)
         popoverWindow.setFrame(frame, display: true)
     }
 
