@@ -29,10 +29,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var localEventMonitor: Any?
     private var globalEventMonitor: Any?
 
-    // Popover width must match MenuBarView's frame width so the
-    // centered anchor rect aligns properly.
-    private let popoverWidth: CGFloat = 240
-    
     // Loading animation timer
     private var loadingTimer: Timer?
     private var loadingFrame = 0
@@ -116,25 +112,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             if popover?.isShown == true {
                 popover?.performClose(nil)
             } else {
-                // Build a wide anchor rect that matches the popover width and
-                // is centered on the status button.  NSPopover positions the
-                // popover relative to this rect, so a matched-width centered
-                // rect keeps the popover centered under the menu bar item
-                // without needing to move the window after showing.
-                let buttonBounds = statusButton.bounds
-                let anchorRect = NSRect(
-                    x: buttonBounds.midX - popoverWidth / 2,
-                    y: 0,
-                    width: popoverWidth,
-                    height: buttonBounds.height
-                )
                 popover?.show(
-                    relativeTo: anchorRect,
+                    relativeTo: statusButton.bounds,
                     of: statusButton,
                     preferredEdge: .minY
                 )
+                DispatchQueue.main.async { [weak self] in
+                    self?.keepPopoverOnScreen()
+                }
             }
         }
+    }
+
+    private func keepPopoverOnScreen() {
+        guard let popoverWindow = popover?.contentViewController?.view.window,
+              let screen = popoverWindow.screen ?? statusItem?.button?.window?.screen else { return }
+
+        let visibleFrame = screen.visibleFrame
+        var frame = popoverWindow.frame
+        let maximumLeft = max(visibleFrame.minX, visibleFrame.maxX - frame.width)
+        frame.origin.x = min(max(frame.minX, visibleFrame.minX), maximumLeft)
+        popoverWindow.setFrame(frame, display: true)
     }
 
     // MARK: - Tự đóng popover khi click ra ngoài
