@@ -1,0 +1,371 @@
+Request
+```bash
+curl --url 'https://chatgpt.com/backend-api/wham/usage/daily-token-usage-breakdown?start_date=2026-10-13&end_date=2026-10-19&group_by=day' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9,vi;q=0.8' \
+  -H 'authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6InFBZ2JmZ3VSbjFRTzMycU5PV0hLTnJGS01Pd1NldzFUYW1GWlBDSTc4SFEiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOlsiaHR0cHM6Ly9hcGkub3BlbmFpLmNvbS92MSJdLCJjbGllbnRfaWQiOiJhcHBfWDh6WTZ2VzJwUTl0UjNkRTduSzFqTDVnSCIsImh0dHBzOi8vYXBpLm9wZW5haS5jb20vYXV0aCI6eyJhbXIiOlsidXJuOm9wZW5haTphbXI6bWljcm9zb2Z0Il0sImNoYXRncHRfYWNjb3VudF9pZCI6IjczMDk3ZGY5LWVmN2MtNDMyZi05MDU1LTA2OWRlMTc2NjlhYyIsImNoYXRncHRfYWNjb3VudF91c2VyX2lkIjoidXNlci1uZFZoQlZTaHRwRlRXR0FSdmZYT0dXR1pfXzczMDk3ZGY5LWVmN2MtNDMyZi05MDU1LTA2OWRlMTc2NjlhYyIsImNoYXRncHRfY29tcHV0ZV9yZXNpZGVuY3kiOiJub19jb25zdHJhaW50IiwiY2hhdGdwdF9sb2dpbl9maW5hbGl6ZXJfYXV0aF9zZXNzaW9uX2lkIjoiYXV0aHNlc3NfZlNCdHF4emYxRFFrZkxjenk4aTF0VHBsIiwiY2hhdGdwdF9sb2dpbl9maW5hbGl6ZXJfaW52aXRlX2ludGVudF9ib3VuZCI6dHJ1ZSwiY2hhdGdwdF9wbGFuX3R5cGUiOiJnbyIsImNoYXRncHRfdXNlcl9pZCI6InVzZXItbmRWaEJWU2h0cEZUV0dBUnZmWE9HV0daIiwidXNlcl9pZCI6InVzZXItbmRWaEJWU2h0cEZUV0dBUnZmWE9HV0daIn0sImh0dHBzOi8vYXBpLm9wZW5haS5jb20vcHJvZmlsZSI6eyJlbWFpbCI6Im5nb2NsZTQ5MkBvdXRsb29rLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJuYW1lIjoiTmdvYyBMZSIsInByZWZlcnJlZF91c2VybmFtZSI6Im5nb2NsZTQ5MkBvdXRsb29rLmNvbSJ9LCJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInB3ZF9hdXRoX3RpbWUiOjE3ODkwMDM2MzQ4NzAsInNjcCI6WyJvcGVuaWQiLCJlbWFpbCIsInByb2ZpbGUiLCJvZmZsaW5lX2FjY2VzcyIsIm1vZGVsLnJlcXVlc3QiLCJtb2RlbC5yZWFkIiwib3JnYW5pemF0aW9uLnJlYWQiLCJvcmdhbml6YXRpb24ud3JpdGUiXSwic2Vzc2lvbl9pZCI6ImF1dGhzZXNzX2ZTQnRxeHpmMURRa2ZMY3p5OGkxdFRwbCIsInNsIjp0cnVlLCJzdWIiOiJ3aW5kb3dzbGl2ZXw4ZDI1NThjM2EyMDNmNjUzIiwiaWF0IjoxNzkxNzcyNzE4LCJleHAiOjE3OTI2MzY3MTgsImp0aSI6ImMzNTEwZGQ5NjIyZDQ2NTBiYzg3YmU3NWY4ZjI1MDYwIiwibmJmIjoxNzkxNzcyNzE4fQ.VBLMT5QBe-XRIRzqmlRsMN06dpNoWRS35IbGBKd6vf18YFnRPH0EOOjmIaCTnQEhyzLrSLtBNvsYPa4bSrAQ0TfzVcTd1Mbo69qy3FwkJ0iGg_7K05sMrwGvH73QAvm58jwxXmovkMAGGqKV_F2mfWzYQpe59qCMQqefI4sFLc-Vwi_6z7NZSvtJXry3sYTE7RuOg-S6UFLANuzKF-3_2JqKtrYf3MY3ZnMxk43rgGhY2AQbzxExwFz96kiGmsZFy6F8z0l72UBs_MciV3sGKwlMj8faIImK-a0FeaVXQQg7MUZ51OSOjltLuY9bwlHzSetokbRi7UUSN-EHAITvCA' \
+  -H 'chatgpt-account-id: 73097df9-ef7c-432f-9055-069de17669ac' \
+  -b 'oai-did=ec2720b4-cb5e-4cc5-9fdc-78fb53c3c449; oai-mweb-origin=1; oai_consent_analytics=true; oai_consent_marketing=true; oai_consent_personalization=true; oai-allow-ne=true; g_state={"i_l":0,"i_ll":1789003501360,"i_b":"QcABmi4pVPx/uoO8/dg2D003Z2SFkTCY/q05TLliTgs","i_e":{"enable_itp_optimization":24},"i_et":1789003501360}; __Host-next-auth.csrf-token=0cec17d010ef882284da4f0ca46d48a146bf4f1b7aa5f4dd5fabf8aa432767e2%7Cd62a6ebd3520accb85995cd6f1d36b5561f4ee6c2e6f04550ccc5de6a3a0be7e; __Secure-next-auth.callback-url=https%3A%2F%2Fchatgpt.com%2F; oai-hlib=true; oai-client-session-epoch=a664c9e8-05b5-42a0-8a35-86edb029bdff; _tt_enable_cookie=1; _ttp=01M2HJC4PT8V2QKD12ZGRGM2RQ_.tt.1.1789443576539; __stripe_mid=fb801a25-0f4e-4703-aa91-09e424611614f58f76; __Secure-oai-is=ois1.eyJ2IjoxLCJhbGciOiJBMjU2R0NNIiwia2lkIjoiY2hhdGdwdC13ZWItdjEifQ.24KG5JC-KJ_xykdZ.eyldLqusVsQ6nAIx3Z2TajDMwa2yDGYSiKWWyNTLiAze4TwLXY3GLi32o7EZbynz_fivmsa_dkEDZCiizVCSoAtnI_q0eRzoqM2UDgziKpmCBHFxNaMaDjWACPh2AL_5rK0yo7bf7Jzv38Gi_3VM2kATSXCXkZFe1qZfQDknsIYyNrOgsq6u3Y3LdWkzmoGIeENogCluZMZZ8kS4oUH1rY9ll8_V2oB9sTjGKEiWCVXqehmr4wCgMz366Bp9KDqpur85fK6yzvKhA5fjA8o65Bvyf9jKMGRveSkWUoWPQA4d2NYCojz3h0DuCrpYmZl9VadBkBLOLFsR6GMDAVX-SPKcvtntdCz7-fi6HmFFK09F_8H8PR8kkLP_T8Bwwpaz12BCMuQkd5b0IfP84KGY4rrm85PsAAEmtVhC8hDoBEdPQJJLdaUMdxGoZo1vBh8BMiJx3T0Ue0Dv5_bBfLpH4zVn3SQNrduynaQi5c-tvgfQ5UUCpa-x1EM267pd1zaLY_GnC59lC2mM6DNSJZmJGudtbUhBKlibKaOQ6ghdK5LjF8Ece6w4bD0X10Qrd266BwwNToVhhJ5oYoUBch87-DFmAuyt7YwZy0LaTuvYSAuj-A-WIVD7J6oprZoCBwWFbATdSEB10PYYBa-0mXZfyP9twCgeSS-ctfwUvRvYbMDbWAMLhDFVCMS_9Pk8A9J3CtgfxMAGUfl9XrJdog9NZ9dzJK5NKoZ2qSqcPxuHHjgacld5eQ2_cD_tYxpeZisUMpMFajf03ZM0Q_Z5oPH5WHiTMMLK9dgn8FfeYn7ql2rm9rxjUtHILGPvJw2JOb4gQyvqzJzA8DP-PzVz328wPYlg9HF5dvqD0aoUFiGW_zqBpn9j6dO88MaiWUyWYANhh1eF3WUr8NW-n-8nXqPoUGAIfrHh; oai-client-auth-info=%7B%22user%22%3A%7B%22name%22%3A%22Ng%E1%BB%8Dc%20L%C3%AA%22%2C%22email%22%3A%22ngocle492%40outlook.com%22%2C%22picture%22%3A%22https%3A%2F%2Fcdn.auth0.com%2Favatars%2Fnl.png%22%2C%22connectionType%22%3A3%2C%22timestamp%22%3A1791772653496%7D%2C%22loggedInWithGoogleOneTap%22%3Afalse%2C%22isOptedOut%22%3Afalse%7D; ttcsid_CVVCC3RC77U3KIMPRRG0=1791772695070::x4Feg29ylUoSxYFMHGk0.2.1791772695070.0; _uetvid=12dea290b0b711f1be821911b4f7ae5b; ttcsid=1791772695071::a6OxMEkd70ZpEbztfPqP.2.1791772695071.0::1.-2455076.0::0.0.0.0::4931.6.0; codex_sidebar_width=340; codex_composer_mode=chat; history_off_6acf325e-a754-83ec-a7ef-100f0fb189fb=1; conv_key_6acf325e-a754-83ec-a7ef-100f0fb189fb="-VJC5cNkrIRugq0BQumLdP3lRqOF44J1yNAV8qVuQ-0="; codex_appearance_theme=light; oai-nav-state=0; oai-last-model-config=%7B%22model%22%3A%22gpt-5-6-thinking%22%2C%22effort%22%3A%22standard%22%7D; _account=73097df9-ef7c-432f-9055-069de17669ac; __oailb=eyJhbGciOiJFUzI1NiIsImtpZCI6Im9haWxiLXYxIiwidHlwIjoiSldUIn0.eyJob3N0IjoiY2hhdC5nYXRld2F5LnVuaWZpZWQtMTk4LmFwaS5vcGVuYWkuY29tIiwiaXNzIjoiZWRnZS1nYXRld2F5IiwiYXVkIjpbImNoYXRncHQuY29tIl0sImV4cCI6MTc5MjQwMDcwMCwiaWF0IjoxNzkyMzk2ODAwfQ.oCxKD00_diUPeSn17C0Z1Dx0xpt2h8PB4Vqst9HZWy_9KITr7qQl0WxqD2vwP2NcAxyBPOuUjx-CaHnPcL6Gwg; __cflb=0H28vzvP5FJafnkHxihKZRMPTs8EfEnoX9637FnfrdH; _cfuvid=muSIXQ3Yu95EIXHp.4Y1ENJ_iSJEg3AEnVp0nR4NNpE-1792397998.43205-1.0.1.1-Tx1HiJANt0pZfPPUgpA8704FNxPXuzk1wDckXaJ6ylI; _puid=user-ndVhBVShtpFTWGARvfXOGWGZ:1792399925-9BKYmJGn2FNC%2FLX2ncjeN4GXVsDeQdsc%2F5FmpfGHI9I%3D; oai-sc=0gAAAAABq1do2L0HvnJz2FMCd2G0uOjYGx77TuJW6aqu9y7y_-A0jXwYRs8U7K0qOmMpYEYVooMhPypcLHriqgfZkxwSkRdNZcGk2w76STxJTanE5Zc8yVZhE_Uu77Q-Q9P_3xVKDkveFt1Q0Mz7MMLcSXDLCf19iCXrzlge_fltirgvuACncxQAk4USZJOqaxVc9Vhl1nHDDLidI2aHfLHBU44yjH-G77tmLmxWZGRB7pwoiIc-Cydk; __Secure-next-auth.session-token.0=eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..-GTGuMrReBzTjyKI.ZVe0OokQ95RlxmSfPOvU9q_40qslArrgGwlR8CzIbyvM4dMHqHtRSBomc76_UqG2eNAShcBLkioZ7apMHPFQp2T4tKvlhToaKfKhTV1tKmELzOI5GfixAyYeiJ1Y63AnbAwDnRY-mdHA4rkBuuAlO_sbe8a_m_z1k-ND9ljedHOOFUtMH-ghWk77uotSCpnvw1Me2aKvS9ur5ma0CEC_N1xtglDFGLc6mfJMsdoq4yVWMccdwByS8RhLNRDC8uZshQAmwObTZ6YPCwaNlmmLDfx9LmdkxkwAY4XHi7l6YT5RL9kRorakFV1kKrcqaLUASeTTPgL4o2Qcj9GTHeq4bJ7xImNolPUBgoS472XtYZNzfkfF4w6y0EmQ6Pzi7ZP7mPJVgdWmW3qeVAZ-OsPdRgEljw9k2wP49pXLhsRCJXRn2bZMtcCM99vulKMJtH5eEtQZrZXaUw_MpiVkrT_5aYoguMDMMOQhiy9Tnl4-GaJs4d1VpLsUQCo-BgyiiURYCMeDYV_oELVzEIe8V4rpznD9ITx-Zok40bg7AjkxMb8UIQEvHzELl5q0WIUi_1VhPVN3iN-P4ZfNyVvm3NwbPuEhKfDA3_aP7yrrQLTgxGP9SzWYAZemSNB7gQvoAIoYj1fn5avMLyVS0u3C4HIc_v73jQgyrw39gmBSeKlit4gNG-vDxFgzWDBeiJ_uzJdYZc7As6QYnXBvOUF4ipx-lmKQfbkwjkxwz4dopyW6hfPztryXer7wYIaiX1SOUB7qZaStbyseNm2OthkXaNaKSYvhFPElYfWJkSzwa3Kj8Jlt29jQKnswy1gZShwEsBSTWAZzhXORoBPijEmgttE3kOTyvNX8SvStzBQvprpuEiE1T-8sbnYeZ32qGLDURx7mm5Cq3rRYg0WU1V3rwMzSpkGeGESRtK3C_HDhlMEPP7Tkqyk3eem6r9IoFvSYU_BcWJG0ITyUGyLBnmLEYderZ_pW5jjI7BQnQUSSn-TONOYbL8YkPHg9HdQwRoPiE3q7bKFrgVYCX8JwxdEHfV2Zn2Y-4jHNdhNjrRRg7KPWN5LVz3ZavNmEqI0BXIDxo29227_j8hhgFSsvHiWXhzeKWL7ucQiafot90NVIEDNkmZf_QV2nEBa4PfWIbEJ1pMkcM_aL9fRySo-ovOC6z7cRin5gUYTdvc4i4ShaS4qwfBm25SWShkLaO9Wtb3wT9vNlRwy-CUTbBAiIbF379KrBGbuHrG0KUjXBrMIabzl7ETM3EUH50CV-3omvfOclT3MC8jtucchCYjVOZ9-0GdtuJ44nJGTfNi6dSFUrRDKKjuseTDP7Ey9qznbIs79S4LjBWuxf9whsKfkHDdTp6E-oBBdzHaf9WHF6vMnDTEiVwreWA2LdoebM9M2ce530dqCj5UiymRhPb3QWLqqdOtUrSgmcWAqWzOoal4_PTcfEdyT01bTOmDxQesVmLBsSUDC0P2fUY6T8CAVRi_U64w_TrgkXFFGcAGxP2VI3Ze7aPxvu2qWvO13rXBihERl1pAlkeiAAUi2RO_2hwREo2DepSqoZJia7SOO8IJ1_o0fM60nB7w3w5-XxMNm2DG9KfKALAn26oehub0VhRYlVw3TY90FuA6qX0oACwO7k3a6S1tikRLIZwgW3O5UeSFJtVIRBCU_GRsUD4xmksD6qRB9wZQvGDNvGH8hrEGYEzQyfbLELQN9A0pHQ2gwB9tt_kw59djL2_yc_ZcXPjrmEgfpap_Yeovu8fXQWc0qEDj5AYbuAu1IgX5NjqK-h3YAivzUCOCKRQCmOLU0YDW_8nS6_XXOJbPY37gNE9SSJ80xpaEthVBSEpETHbSXqsfDJk2jMAhJZk2lw427ZCrwX8ScA7oD7Eiw87rQMACVhihmjJY_EzAktkGqB2hnainJ7dMFIUQxPbgczTlSp1BObQic6s49uyS3prs5K1VRMctgcQSbsmrPuoqss-Y2GJs1OuVUoUBAN_bvT6VuY_r-I5shESmSW62_LoifNTVi8-smXSH1eK6qmY2s5ROsylwHUUTj-IQle4NN85CzLKT3N0MbbN4IJdt6M_43tfgS46A6xdKzSkMBw4ShBtwNMbX93aJcugx0v7wQikijEL9DB_siSKzJbFDzte4JJwKvZ3h-R_GqfvUqP8NzhaZA-ENylw2Ba-Ok5wAz3kemujrmqx65-eKMEaxgdDdH8ny5bzwqlYxEULB9jemFnqXqPrhSdipdArzt2mZdvsy7UPbFqFqvYOLPUzit6cKfmss8rERhkjGuZ7FaR5bQEE03UQiQH76Zikz-AGl34ToWneuyHgb8n9zp0ijCAYsahP5idYuBujNpk9qikjNBZlU3UzL3hFMJ_Zn462nHRLYsuqBQdgB9-2YKfXwYSh9sjdC_Md2UkjJyHIm85PFDxRsiyU_g2XUoxODMN2ZyrQ-mw48L_P7Hx8iUVjasPH545EyZUnUbwvgIfLrGcU7CAKKX8oKZ0eGGN21dd8vmFKoJuUG_mLIduFk2kVjrxJ6HigBeOkui60FL362NIQZ_57F5BumQFAA7dXposbDR0bEa7HzU_hKZDxfaw_BBHrD2zjMv-dIAtai0utozM6hTICrgCv2Dy0ka_B-L4ucl34IfJjgIfu25QN2e-kdGxU8rt_78syjKz9f_dm8B7Is5nVllTFDXU9zcP95xwc9h570BJJxXSLf1nnbp54pRxGB_amT4NaG47YNS8a87VL3GjwnxCGfqdWjteV3tQGQojtBb4UozQHwMwjUh9axugF_UFl1M5o2InpVZ5HH1K9VPRqYZUftctSjJO3y_OgZV_H5LBYjevlHww__28lAOyfxwcQT5Mj5QooB9oqgPsMS7ENbTLZOpo0EOhq7s_bIA7sOcjLn4kItUIqP-ldvXtmEdsXnKQpNt-s1PC-i7qJoOD8xql-osIFsh-KSptN1fUkaVGCVJ6JhvpraiwgdWw4aZa1Oe6QIxkxzbzluoPdeeO4_wg6698OTojjkxu3C893qoGDCyFcKUf9QwvPBOyHIAMcQDa-s6wKKlv7m33lpKpHhHZo8oXjfnIknI-34mav4MdjFRq7JG9fxU9CmLXthTFcfP8D1-OaKxuNYGXOH1ysKFqnaM57AhITB645IXo-9yEr1w_pT3Kv1momauOt9zUiVbu3HeZYD-k1xDlzdjbT0roHwQC9FdVHOMq85zITi0ewGvXjUwUOKQUdC9PKhu5U01zQQZaqC16AYI0WNojSRhmNBiPqtd9B2zpOj4vDWcB2YG0QIrxAbLTwxGSkft9VSy4B9McDwZrs1WR-Wx0LExpgNVXIx8wxozZ4U4Kgo7B0voKVu9vdNXB3OapepZjvOqqYUDegYKEesEXQ4ixKXHJymTeGu_Hx0aIO6SGWu3N6B8p3jzIYvW9UOVbgcFLD5YdZ6HYuQ92ihdIUeIk-l8PQlaJFFHTcJVt8YCIP0GYlBq0IOEiuUZfTVSPbNz8Ny84y9QKRC9G7n2ElWQdvm82Z_UP4rWNopmzvNWzQYyvnnoOCpLwx7vP5G79GCDV6YoxmsjNRn2oNBGygIHNJ3-cJq5VM1YAskYc9w7Vf-z8DRGSYppA5OimGAItAT2CBSHMBP3nhDQd6bWHLLhvaFzlOYPydvEL6z_IkckYf9-D4-znxwCL00Mh2WaiXdViqQz16b2R_YJyyyEwCvLryKrz9aHrCA6qKwwzig9nFOBZwxAuN52HQ-hg4LdVV2he6kz-Id5PYipaQQ4eHfjjJZcFtq70SSA42wFuuHRWnjjR69ysQjvDdm-H-800GRM0XaxnnpQZJ19-Dh8UvwFtxoW2_dO5GWO_QawDSuV0Y3pwMOc1pdJlEf0yl09n3M1rNA-; __Secure-next-auth.session-token.1=jYLZc7BxZawQFxgY93YKBseehgAO9umVxlwP54cSX0KEtEUaJe7cbyler0PIy0KxC39xgRA8NMw.vQkLRFeY3jp9eyXUrrwFeQ; oai_pl_permission_state=not_set; cf_clearance=As3JzW7pq8t0RWxt3Flfw2IJepbXJICzKFJ.QwD_5Fo-1792400152-1.2.1.1-bglEHGfhIzL9CqhugN_2SpabFymPREZ90pESE6rhLEv6NZPjMOyyL2OqaYs7P7Q2RnoSOwb_XEYUZ3RvDStcsYFCPZyVx35lYj6jhhCo1g3CByUdJciuxYc3WEcebqGmbY0iYad9by5yrFZi.p5UZCJrCyRilMv2Ru7aih5H5W71iCjokkctEo2eY0PM.guSnlEODH1gfc7eYuDNHlPhFmMB9e31ux96xhbcGVlEcKQPI5ldmRPvpaSAuNyyJpgWWIGASwWkd.vdDgD44LQec2lRqTkbaKA_haAVGVBxYOVq18H03VHPIKNv0w1UFP4OkgoQjb7S6QrthM8_xKxCT2AHdWtm6MTNI7dzvHaZi6g; __cf_bm=2Mr4_N4HeDmpqliPOXmPC3pSOJVsEr8SlfFgKDGkbeA-1792400152.7716722-1.0.1.1-ZDqY_PCa8Oyr0wggFnZGgaZqi3qIcgU3bYkAP6AJwRTHTzeG41u8CUb28mDESXqMN_T_WnOSuuT3OJXFcSYs0Wfevr1g80Tpngmm4Fy1xhfIYxNR.T8hW5H3W0gk4Kxk; __obi=zonTh7Zu14hbiNCyPILb0Q; _dd_s_v2=aid=b30db37b-d0b1-498b-a3fe-612810e1e00c&id=9003a117-a899-468d-9065-45db4b0643a8&created=1792398605937&expire=1792401268107&c=0' \
+  -H 'oai-did: ec2720b4-cb5e-4cc5-9fdc-78fb53c3c449' \
+  -H 'oai-language: en-US' \
+  -H 'originator: Codex Browser' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://chatgpt.com/' \
+  -H 'sec-ch-ua: "Microsoft Edge";v="155", "Chromium";v="155", "Not(A:Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0' \
+  -H 'x-openai-codex-usage-categories: 1' \
+  -H 'x-openai-codex-window-type: browser' \
+  -H 'x-openai-web-frontend: codex_webview'
+```
+
+Response
+```json
+{
+  "data": [
+    {
+      "attribution": [],
+      "date": "2026-10-13",
+      "product_surface_usage_values": {
+        "cli": 0.0,
+        "vscode": 0.0,
+        "web": 0.0,
+        "work_web": 0.0,
+        "mobile": 0.0,
+        "work_mobile": 0.0,
+        "slack": 0.0,
+        "linear": 0.0,
+        "jetbrains": 0.0,
+        "sdk": 0.0,
+        "exec": 0.0,
+        "github": 0.0,
+        "desktop_app": 0.0,
+        "work_desktop": 0.0,
+        "github_code_review": 0.0,
+        "codex_security_cloud": 0.0,
+        "agent_identity": 0.0,
+        "unknown": 0.0
+      },
+      "models": [
+        {
+          "model": "gpt-6-luna",
+          "speed": "standard",
+          "credits": 0.0
+        },
+        {
+          "model": "codex-auto-review",
+          "speed": "standard",
+          "credits": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "speed": "standard",
+          "credits": 0.0
+        }
+      ]
+    },
+    {
+      "attribution": [],
+      "date": "2026-10-14",
+      "product_surface_usage_values": {
+        "cli": 0.0,
+        "vscode": 0.0,
+        "web": 0.0,
+        "work_web": 0.0,
+        "mobile": 0.0,
+        "work_mobile": 0.0,
+        "slack": 0.0,
+        "linear": 0.0,
+        "jetbrains": 0.0,
+        "sdk": 0.0,
+        "exec": 0.0,
+        "github": 0.0,
+        "desktop_app": 0.0,
+        "work_desktop": 0.0,
+        "github_code_review": 0.0,
+        "codex_security_cloud": 0.0,
+        "agent_identity": 0.0,
+        "unknown": 0.0
+      },
+      "models": [
+        {
+          "model": "gpt-6-luna",
+          "speed": "standard",
+          "credits": 0.0
+        },
+        {
+          "model": "codex-auto-review",
+          "speed": "standard",
+          "credits": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "speed": "standard",
+          "credits": 0.0
+        }
+      ]
+    },
+    {
+      "attribution": [],
+      "date": "2026-10-15",
+      "product_surface_usage_values": {
+        "cli": 0.0,
+        "vscode": 0.0,
+        "web": 0.0,
+        "work_web": 0.0,
+        "mobile": 0.0,
+        "work_mobile": 0.0,
+        "slack": 0.0,
+        "linear": 0.0,
+        "jetbrains": 0.0,
+        "sdk": 0.0,
+        "exec": 0.0,
+        "github": 0.0,
+        "desktop_app": 0.0,
+        "work_desktop": 0.0,
+        "github_code_review": 0.0,
+        "codex_security_cloud": 0.0,
+        "agent_identity": 0.0,
+        "unknown": 0.0
+      },
+      "models": [
+        {
+          "model": "gpt-6-luna",
+          "speed": "standard",
+          "credits": 0.0
+        },
+        {
+          "model": "codex-auto-review",
+          "speed": "standard",
+          "credits": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "speed": "standard",
+          "credits": 0.0
+        }
+      ]
+    },
+    {
+      "attribution": [
+        {
+          "thread_source": "guardian_review",
+          "turn_trigger": "guardian_review",
+          "model": "codex-auto-review",
+          "surface": "unknown",
+          "value": 9.827613588839165
+        },
+        {
+          "thread_source": "thread_title",
+          "turn_trigger": "thread_title",
+          "model": "gpt-6-luna",
+          "surface": "work_desktop",
+          "value": 0.0944226995075758
+        },
+        {
+          "thread_source": "thread_title",
+          "turn_trigger": "unknown",
+          "model": "gpt-5.6-luna",
+          "surface": "cli",
+          "value": 0.13612583421741933
+        },
+        {
+          "thread_source": "unknown",
+          "turn_trigger": "unknown",
+          "model": "gpt-5.6-luna",
+          "surface": "unknown",
+          "value": 7.648534656036861
+        },
+        {
+          "thread_source": "unknown",
+          "turn_trigger": "unknown",
+          "model": "gpt-6-luna",
+          "surface": "unknown",
+          "value": 81.12091180521617
+        },
+        {
+          "thread_source": "user",
+          "turn_trigger": "composer",
+          "model": "gpt-6-luna",
+          "surface": "work_desktop",
+          "value": 0.7740024305032517
+        },
+        {
+          "thread_source": "user",
+          "turn_trigger": "user",
+          "model": "gpt-6-luna",
+          "surface": "cli",
+          "value": 0.3983889856795557
+        }
+      ],
+      "date": "2026-10-16",
+      "product_surface_usage_values": {
+        "cli": 0.5345148198969751,
+        "vscode": 0.0,
+        "web": 0.0,
+        "work_web": 0.0,
+        "mobile": 0.0,
+        "work_mobile": 0.0,
+        "slack": 0.0,
+        "linear": 0.0,
+        "jetbrains": 0.0,
+        "sdk": 0.0,
+        "exec": 0.0,
+        "github": 0.0,
+        "desktop_app": 0.0,
+        "work_desktop": 0.8684251300108278,
+        "github_code_review": 0.0,
+        "codex_security_cloud": 0.0,
+        "agent_identity": 0.0,
+        "unknown": 98.5970600500922
+      },
+      "models": [
+        {
+          "model": "gpt-6-luna",
+          "speed": "standard",
+          "credits": 82.38772592090656
+        },
+        {
+          "model": "codex-auto-review",
+          "speed": "standard",
+          "credits": 9.827613588839167
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "speed": "standard",
+          "credits": 7.78466049025428
+        }
+      ]
+    },
+    {
+      "attribution": [],
+      "date": "2026-10-17",
+      "product_surface_usage_values": {
+        "cli": 0.0,
+        "vscode": 0.0,
+        "web": 0.0,
+        "work_web": 0.0,
+        "mobile": 0.0,
+        "work_mobile": 0.0,
+        "slack": 0.0,
+        "linear": 0.0,
+        "jetbrains": 0.0,
+        "sdk": 0.0,
+        "exec": 0.0,
+        "github": 0.0,
+        "desktop_app": 0.0,
+        "work_desktop": 0.0,
+        "github_code_review": 0.0,
+        "codex_security_cloud": 0.0,
+        "agent_identity": 0.0,
+        "unknown": 0.0
+      },
+      "models": [
+        {
+          "model": "gpt-6-luna",
+          "speed": "standard",
+          "credits": 0.0
+        },
+        {
+          "model": "codex-auto-review",
+          "speed": "standard",
+          "credits": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "speed": "standard",
+          "credits": 0.0
+        }
+      ]
+    },
+    {
+      "attribution": [],
+      "date": "2026-10-18",
+      "product_surface_usage_values": {
+        "cli": 0.0,
+        "vscode": 0.0,
+        "web": 0.0,
+        "work_web": 0.0,
+        "mobile": 0.0,
+        "work_mobile": 0.0,
+        "slack": 0.0,
+        "linear": 0.0,
+        "jetbrains": 0.0,
+        "sdk": 0.0,
+        "exec": 0.0,
+        "github": 0.0,
+        "desktop_app": 0.0,
+        "work_desktop": 0.0,
+        "github_code_review": 0.0,
+        "codex_security_cloud": 0.0,
+        "agent_identity": 0.0,
+        "unknown": 0.0
+      },
+      "models": [
+        {
+          "model": "gpt-6-luna",
+          "speed": "standard",
+          "credits": 0.0
+        },
+        {
+          "model": "codex-auto-review",
+          "speed": "standard",
+          "credits": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "speed": "standard",
+          "credits": 0.0
+        }
+      ]
+    },
+    {
+      "attribution": [],
+      "date": "2026-10-19",
+      "product_surface_usage_values": {
+        "cli": 0.0,
+        "vscode": 0.0,
+        "web": 0.0,
+        "work_web": 0.0,
+        "mobile": 0.0,
+        "work_mobile": 0.0,
+        "slack": 0.0,
+        "linear": 0.0,
+        "jetbrains": 0.0,
+        "sdk": 0.0,
+        "exec": 0.0,
+        "github": 0.0,
+        "desktop_app": 0.0,
+        "work_desktop": 0.0,
+        "github_code_review": 0.0,
+        "codex_security_cloud": 0.0,
+        "agent_identity": 0.0,
+        "unknown": 0.0
+      },
+      "models": [
+        {
+          "model": "gpt-6-luna",
+          "speed": "standard",
+          "credits": 0.0
+        },
+        {
+          "model": "codex-auto-review",
+          "speed": "standard",
+          "credits": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "speed": "standard",
+          "credits": 0.0
+        }
+      ]
+    }
+  ],
+  "units": "percent",
+  "group_by": "day"
+}
+```

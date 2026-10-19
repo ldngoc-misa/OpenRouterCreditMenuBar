@@ -658,6 +658,7 @@ struct TopModelsBlock: View {
 
 struct MenuBarView: View {
     @EnvironmentObject var creditManager: OpenRouterCreditManager
+    @EnvironmentObject var chatGPTManager: ChatGPTManager
     @State private var selectedProvider: ProviderTab = .openRouter
 
     private enum ProviderTab: String, CaseIterable, Identifiable {
@@ -822,7 +823,7 @@ struct MenuBarView: View {
         case .openRouter:
             openRouterDashboard
         case .openAI:
-            OpenAIProviderView()
+            OpenAIProviderView(manager: chatGPTManager)
         case .antigravity:
             AntigravityProviderView()
         }
@@ -864,23 +865,17 @@ struct MenuBarView: View {
                     .font(.system(size: 13, weight: .medium))
                 Spacer()
 
-                if selectedProvider == .openRouter {
-                    ToolbarButton(
-                        systemName: "arrow.clockwise",
-                        tooltip: "Refresh OpenRouter",
-                        action: {
-                            Task {
-                                await creditManager.fetchCredit()
-                                await MainActor.run {
-                                    if let appDelegate = NSApp.delegate as? AppDelegate {
-                                        appDelegate.updateMenuBarTitle()
-                                    }
-                                }
-                            }
-                        },
-                        isLoading: creditManager.isLoading
-                    )
+                ToolbarButton(
+                    systemName: "arrow.clockwise",
+                    tooltip: "Refresh \(selectedProvider.rawValue)",
+                    action: refreshSelectedProvider,
+                    isLoading: selectedProvider == .openRouter
+                        ? creditManager.isLoading
+                        : chatGPTManager.isLoading
+                )
+                .disabled(selectedProvider == .antigravity)
 
+                if selectedProvider == .openRouter {
                     ToolbarButton(
                         systemName: "globe",
                         tooltip: "View OpenRouter Activity"
@@ -914,77 +909,209 @@ struct MenuBarView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .frame(width: 720)
+        .frame(width: 720, height: 544, alignment: .top)
+    }
+
+    private func refreshSelectedProvider() {
+        switch selectedProvider {
+        case .openRouter:
+            Task {
+                await creditManager.refresh()
+                if let appDelegate = NSApp.delegate as? AppDelegate {
+                    appDelegate.updateMenuBarTitle()
+                }
+            }
+        case .openAI:
+            chatGPTManager.refresh()
+        case .antigravity:
+            break
+        }
     }
 }
 
 private struct OpenAIProviderView: View {
+    @ObservedObject var manager: ChatGPTManager
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("OpenAI")
-                        .font(.title2.weight(.semibold))
-                    Text("ChatGPT subscription and API usage")
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("OpenAI")
+                            .font(.title2.weight(.semibold))
+                        if let lastUpdated = manager.lastUpdated {
+                            Text("Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    Text("ChatGPT account and usage")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Label("Not connected", systemImage: "circle.dashed")
+                Label(manager.isConnected ? "Connected" : "Not connected", systemImage: manager.isConnected ? "checkmark.circle.fill" : "circle.dashed")
                     .font(.caption)
+                    .foregroundStyle(manager.isConnected ? .green : .secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Label("CHATGPT", systemImage: "sparkle")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-            }
 
-            HStack(alignment: .top, spacing: 14) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Label("CHATGPT", systemImage: "bubble.left.and.bubble.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text("Plan and limits")
-                        .font(.headline)
-                    ProviderValueRow(title: "Subscription", value: "Not connected")
-                    ProviderValueRow(title: "Usage", value: "Unavailable")
-                    ProviderValueRow(title: "Limit reset", value: "Unavailable")
-                    Spacer(minLength: 0)
-                    Label("ChatGPT account data", systemImage: "person.crop.circle")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
-                .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Label("API", systemImage: "terminal")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Cost")
-                            .font(.headline)
-                        Spacer()
-                        Text("Unavailable")
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label("Account", systemImage: "person.crop.circle")
+                            .font(.caption.weight(.semibold))
+                        ProviderValueRow(title: "Email", value: manager.accountEmail ?? "Unavailable")
+                        ProviderValueRow(title: "Plan", value: manager.planType?.capitalized ?? "Unavailable")
+                        if let usedPercent = manager.usedPercent {
+                            HStack(spacing: 5) {
+                                Text("Usage").foregroundStyle(.secondary)
+                                Spacer(minLength: 0)
+                                ProgressView(value: min(Double(usedPercent), 100), total: 100)
+                                    .tint(usedPercent >= 100 ? .red : .accentColor)
+                                    .frame(width: 62)
+                                Text("\(usedPercent)%")
+                                    .font(.caption.monospacedDigit())
+                                    .frame(minWidth: 30, alignment: .trailing)
+                            }
+                            .font(.caption)
+                        } else {
+                            ProviderValueRow(title: "Usage", value: "Unavailable")
+                        }
+                        ProviderValueRow(
+                            title: "Limit reset",
+                            value: manager.resetAt?.formatted(date: .abbreviated, time: .shortened) ?? "Unavailable"
+                        )
+                        if !manager.isConnected {
+                            Text(manager.isLoading ? "Checking session…" : "Connect in Settings")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    Divider()
-                    ProviderValueRow(title: "Tokens", value: "Unavailable")
-                    ProviderValueRow(title: "Requests", value: "Unavailable")
-                    ProviderValueRow(title: "Budget", value: "Not configured")
-                    Spacer(minLength: 0)
-                    Label("API organization usage", systemImage: "chart.bar")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
-                .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
-            }
+                    .padding(9)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
 
-            Label("Connect OpenAI in Settings to show account and usage details.", systemImage: "info.circle")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 4) {
+                            Label("Usage Overview", systemImage: "chart.bar")
+                                .font(.caption.weight(.semibold))
+                            Spacer(minLength: 2)
+                            ForEach([7, 30], id: \.self) { days in
+                                Button("\(days)d") { manager.setUsageOverviewDays(days) }
+                                    .font(.caption.weight(manager.usageOverviewDays == days ? .semibold : .regular))
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(manager.usageOverviewDays == days ? Color.accentColor : Color.secondary)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        manager.usageOverviewDays == days ? Color.accentColor.opacity(0.14) : .clear,
+                                        in: Capsule()
+                                    )
+                                    .disabled(manager.isLoading)
+                            }
+                        }
+                        if !manager.usageOverview.isEmpty {
+                            ForEach(manager.usageOverview) { metric in
+                                ProviderValueRow(title: metric.name, value: metric.value)
+                            }
+                        } else {
+                            Text(manager.isLoading ? "Loading…" : "Unavailable")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(9)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 4) {
+                            Label("Analytics", systemImage: "chart.xyaxis.line")
+                                .font(.caption.weight(.semibold))
+                            Spacer(minLength: 2)
+                            ForEach([7, 30], id: \.self) { days in
+                                Button("\(days)d") { manager.setAnalyticsDays(days) }
+                                    .font(.caption.weight(manager.analyticsDays == days ? .semibold : .regular))
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(manager.analyticsDays == days ? Color.accentColor : Color.secondary)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        manager.analyticsDays == days ? Color.accentColor.opacity(0.14) : .clear,
+                                        in: Capsule()
+                                    )
+                                    .disabled(manager.isLoading)
+                            }
+                        }
+                        Text("Credits by model")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        if let error = manager.analyticsErrorMessage {
+                            Text(error).font(.caption).foregroundStyle(.secondary)
+                        } else if manager.modelUsage.isEmpty {
+                            Text(manager.isLoading ? "Loading…" : "No model usage")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    ForEach(manager.modelUsage) { metric in
+                                        ProviderValueRow(title: metric.name, value: metric.value)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(9)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 170, alignment: .topLeading)
+            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
+
+            VStack(alignment: .leading, spacing: 10) {
+                Label("API", systemImage: "terminal")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 18) {
+                    apiMetric("Cost", value: "Unavailable")
+                    apiMetric("Tokens", value: "Unavailable")
+                    apiMetric("Requests", value: "Unavailable")
+                    apiMetric("Budget", value: "Not configured")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 170, alignment: .topLeading)
+            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
+
+            if let error = manager.errorMessage, manager.isConnected {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
         }
         .padding(.vertical, 8)
+    }
+
+    private func apiMetric(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.primary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -1082,5 +1209,6 @@ struct MenuBarView_Previews: PreviewProvider {
     static var previews: some View {
         MenuBarView()
             .environmentObject(OpenRouterCreditManager())
+            .environmentObject(ChatGPTManager())
     }
 }

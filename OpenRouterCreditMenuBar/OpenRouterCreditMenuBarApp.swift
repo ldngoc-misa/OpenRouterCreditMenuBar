@@ -16,14 +16,17 @@ struct OpenRouterCreditMenuBarApp: App {
         Settings {
             SettingsView()
                 .environmentObject(appDelegate.creditManager)
+                .environmentObject(appDelegate.chatGPTManager)
         }
     }
 }
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     var statusItem: NSStatusItem?
     var popover: NSPopover?
     @Published var creditManager = OpenRouterCreditManager()
+    @Published var chatGPTManager = ChatGPTManager()
 
     // Bộ theo dõi sự kiện chuột để tự đóng popover khi click ra ngoài
     private var localEventMonitor: Any?
@@ -73,6 +76,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover?.contentViewController = NSHostingController(
             rootView: MenuBarView()
                 .environmentObject(creditManager)
+                .environmentObject(chatGPTManager)
         )
         popover?.behavior = .transient
         popover?.delegate = self
@@ -96,15 +100,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             }
         }
 
-        // ตั้ง timer สำหรับ refresh
-        Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { _ in
-            Task {
-                await self.creditManager.fetchCredit()
-                await MainActor.run {
-                    self.updateMenuBarTitle()
-                }
-            }
-        }
     }
 
     @objc func showMenu() {
@@ -218,9 +213,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem?.button?.title = loadingFrames[0]
         
         loadingTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            self.loadingFrame = (self.loadingFrame + 1) % self.loadingFrames.count
-            self.statusItem?.button?.title = self.loadingFrames[self.loadingFrame]
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.loadingFrame = (self.loadingFrame + 1) % self.loadingFrames.count
+                self.statusItem?.button?.title = self.loadingFrames[self.loadingFrame]
+            }
         }
     }
     

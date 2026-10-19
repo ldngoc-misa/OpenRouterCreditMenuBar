@@ -551,6 +551,10 @@ class OpenRouterCreditManager: ObservableObject {
         }
     }
 
+    func refresh() async {
+        await fetchCredit()
+    }
+
     func pauseMonitoring() {
         refreshTimer?.invalidate()
         refreshTimer = nil

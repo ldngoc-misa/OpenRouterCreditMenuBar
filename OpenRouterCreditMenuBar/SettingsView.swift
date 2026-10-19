@@ -8,10 +8,12 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var creditManager: OpenRouterCreditManager
+    @EnvironmentObject var chatGPTManager: ChatGPTManager
     @State private var apiKey: String = ""
     @State private var isEnabled: Bool = true
     @State private var openAtLogin: Bool = false
     @State private var refreshInterval: Double = 300  // default 5 minutes
+    @State private var isShowingChatGPTLogin = false
 
     private let refreshIntervalOptions: [Double] = [30, 60, 180, 300, 600, 1800, 3600]
 
@@ -46,9 +48,10 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .onChange(of: refreshInterval) { _, newValue in
                         creditManager.refreshInterval = newValue
+                        chatGPTManager.setRefreshInterval(newValue)
                     }
 
-                    Text("How often to check credit balance")
+                    Text("Applies to all connected providers")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -80,9 +83,28 @@ struct SettingsView: View {
             }
 
             Section("OpenAI") {
-                LabeledContent("ChatGPT", value: "Not connected")
-                LabeledContent("API usage", value: "Not connected")
-                Text("ChatGPT account and API usage connections will be configured here.")
+                LabeledContent("ChatGPT", value: chatGPTManager.isConnected ? "Connected" : "Not connected")
+                if let email = chatGPTManager.accountEmail {
+                    LabeledContent("Account", value: email)
+                }
+                HStack {
+                    Button(chatGPTManager.isConnected ? "Open ChatGPT Login" : "Connect ChatGPT") {
+                        chatGPTManager.openLogin()
+                        isShowingChatGPTLogin = true
+                    }
+                    if chatGPTManager.isConnected {
+                        Button("Disconnect", role: .destructive) { chatGPTManager.disconnect() }
+                    }
+                    if chatGPTManager.isLoading {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                if let error = chatGPTManager.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                Text("Sign in to ChatGPT in the embedded window. The session stays on this Mac for automatic refresh.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -107,6 +129,10 @@ struct SettingsView: View {
         .onAppear {
             loadSettings()
         }
+        .sheet(isPresented: $isShowingChatGPTLogin) {
+            ChatGPTLoginSheet(manager: chatGPTManager)
+                .frame(minWidth: 720, minHeight: 600)
+        }
     }
 
     private func loadSettings() {
@@ -125,6 +151,26 @@ struct SettingsView: View {
             }
         } catch {
             print("Failed to \(enabled ? "enable" : "disable") login item: \(error)")
+        }
+    }
+}
+
+private struct ChatGPTLoginSheet: View {
+    @ObservedObject var manager: ChatGPTManager
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(manager.isConnected ? "ChatGPT connected" : "Sign in to ChatGPT")
+                    .font(.headline)
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+            Divider()
+            ChatGPTWebView(manager: manager)
         }
     }
 }
