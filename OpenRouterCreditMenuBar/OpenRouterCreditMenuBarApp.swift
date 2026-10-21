@@ -17,6 +17,8 @@ struct OpenRouterCreditMenuBarApp: App {
             SettingsView()
                 .environmentObject(appDelegate.creditManager)
                 .environmentObject(appDelegate.chatGPTManager)
+                .environmentObject(appDelegate.openAIAPIManager)
+                .environmentObject(appDelegate.openAIPlatformLoginManager)
         }
     }
 }
@@ -27,6 +29,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     var popover: NSPopover?
     @Published var creditManager = OpenRouterCreditManager()
     @Published var chatGPTManager = ChatGPTManager()
+    @Published var openAIAPIManager = OpenAIAPIManager()
+    @Published var openAIPlatformLoginManager = OpenAIPlatformLoginManager()
 
     // Bộ theo dõi sự kiện chuột để tự đóng popover khi click ra ngoài
     private var localEventMonitor: Any?
@@ -77,6 +81,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             rootView: MenuBarView()
                 .environmentObject(creditManager)
                 .environmentObject(chatGPTManager)
+                .environmentObject(openAIAPIManager)
+                .environmentObject(openAIPlatformLoginManager)
         )
         popover?.behavior = .transient
         popover?.delegate = self
@@ -95,6 +101,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // เริ่ม fetch credit
         Task {
             await creditManager.fetchCredit()
+            await openAIAPIManager.refresh()
             await MainActor.run {
                 updateMenuBarTitle()
             }

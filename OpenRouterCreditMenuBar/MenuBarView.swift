@@ -659,6 +659,8 @@ struct TopModelsBlock: View {
 struct MenuBarView: View {
     @EnvironmentObject var creditManager: OpenRouterCreditManager
     @EnvironmentObject var chatGPTManager: ChatGPTManager
+    @EnvironmentObject var openAIAPIManager: OpenAIAPIManager
+    @EnvironmentObject var openAIPlatformLoginManager: OpenAIPlatformLoginManager
     @State private var selectedProvider: ProviderTab = .openRouter
 
     private enum ProviderTab: String, CaseIterable, Identifiable {
@@ -823,7 +825,11 @@ struct MenuBarView: View {
         case .openRouter:
             openRouterDashboard
         case .openAI:
-            OpenAIProviderView(manager: chatGPTManager)
+            OpenAIProviderView(
+                manager: chatGPTManager,
+                apiManager: openAIAPIManager,
+                platformManager: openAIPlatformLoginManager
+            )
         case .antigravity:
             AntigravityProviderView()
         }
@@ -871,7 +877,9 @@ struct MenuBarView: View {
                     action: refreshSelectedProvider,
                     isLoading: selectedProvider == .openRouter
                         ? creditManager.isLoading
-                        : chatGPTManager.isLoading
+                        : selectedProvider == .openAI
+                            ? chatGPTManager.isLoading || openAIAPIManager.isLoading
+                            : false
                 )
                 .disabled(selectedProvider == .antigravity)
 
@@ -923,6 +931,8 @@ struct MenuBarView: View {
             }
         case .openAI:
             chatGPTManager.refresh()
+            Task { await openAIAPIManager.refresh() }
+            openAIPlatformLoginManager.refreshAccount()
         case .antigravity:
             break
         }
@@ -931,6 +941,8 @@ struct MenuBarView: View {
 
 private struct OpenAIProviderView: View {
     @ObservedObject var manager: ChatGPTManager
+    @ObservedObject var apiManager: OpenAIAPIManager
+    @ObservedObject var platformManager: OpenAIPlatformLoginManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1077,20 +1089,121 @@ private struct OpenAIProviderView: View {
             .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
 
             VStack(alignment: .leading, spacing: 10) {
-                Label("API", systemImage: "terminal")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 18) {
-                    apiMetric("Cost", value: "Unavailable")
-                    apiMetric("Tokens", value: "Unavailable")
-                    apiMetric("Requests", value: "Unavailable")
-                    apiMetric("Budget", value: "Not configured")
+                HStack {
+                    Label("API", systemImage: "terminal")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if let lastUpdated = apiManager.lastUpdated {
+                        Text("Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    Label(
+                        apiManager.isConnected ? "Connected" : "Not connected",
+                        systemImage: apiManager.isConnected ? "checkmark.circle.fill" : "circle.dashed"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(apiManager.isConnected ? .green : .secondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(alignment: .top, spacing: 8) {
+                    OpenAIMetricBlock(title: "COST", metrics: [
+                        OpenAIMetricValue(
+                            label: "Spend Today",
+                            value: apiManager.todayCost.map(Self.formatCurrency) ?? "--",
+                            details: apiManager.costsByLineItem
+                                .sorted { $0.todayAmount > $1.todayAmount }
+                                .prefix(8)
+                                .map { item in
+                                    (
+                                        [item.lineItem, item.projectID].compactMap { $0 }.joined(separator: " · "),
+                                        Self.formatCurrency(item.todayAmount)
+                                    )
+                                }
+                        ),
+                        OpenAIMetricValue(
+                            label: "Available",
+                            value: platformManager.availableCredit.map(Self.formatCurrency) ?? "--",
+                            details: [(
+                                platformManager.availableCredit == nil
+                                    ? (platformManager.creditGrantsErrorMessage ?? "Sign in to OpenAI Platform")
+                                    : "Available credit",
+                                platformManager.availableCredit.map(Self.formatCurrency) ?? "Unavailable"
+                            )]
+                        )
+                    ])
+                    OpenAIMetricBlock(title: "TOKENS", metrics: [
+                        OpenAIMetricValue(
+                            label: "Today",
+                            value: apiManager.todayTokens.map { formatAbbreviated($0) } ?? "--",
+                            details: apiManager.usageByModel
+                                .sorted { $0.todayTokens > $1.todayTokens }
+                                .prefix(8)
+                                .map { item in
+                                    (
+                                        [item.model, item.projectID].compactMap { $0 }.joined(separator: " · "),
+                                        formatAbbreviated(item.todayTokens)
+                                    )
+                                }
+                        ),
+                        OpenAIMetricValue(
+                            label: "This Week",
+                            value: apiManager.weekTokens.map { formatAbbreviated($0) } ?? "--",
+                            details: apiManager.usageByModel
+                                .sorted { $0.tokens > $1.tokens }
+                                .prefix(8)
+                                .map { item in
+                                    (
+                                        [item.model, item.projectID].compactMap { $0 }.joined(separator: " · "),
+                                        formatAbbreviated(item.tokens)
+                                    )
+                                }
+                        )
+                    ])
+                    OpenAIMetricBlock(title: "REQUEST", metrics: [
+                        OpenAIMetricValue(
+                            label: "Today",
+                            value: apiManager.todayRequests.map { formatAbbreviated($0) } ?? "--",
+                            details: apiManager.usageByModel
+                                .sorted { $0.todayRequests > $1.todayRequests }
+                                .prefix(8)
+                                .map { item in
+                                    (
+                                        [item.model, item.projectID].compactMap { $0 }.joined(separator: " · "),
+                                        formatAbbreviated(item.todayRequests)
+                                    )
+                                }
+                        ),
+                        OpenAIMetricValue(
+                            label: "This Week",
+                            value: apiManager.weekRequests.map { formatAbbreviated($0) } ?? "--",
+                            details: apiManager.usageByModel
+                                .sorted { $0.requests > $1.requests }
+                                .prefix(8)
+                                .map { item in
+                                    (
+                                        [item.model, item.projectID].compactMap { $0 }.joined(separator: " · "),
+                                        formatAbbreviated(item.requests)
+                                    )
+                                }
+                        )
+                    ])
+                }
+
+                if !apiManager.isConnected {
+                    Text(apiManager.isLoading
+                        ? "Loading API usage…"
+                        : (apiManager.usageErrorMessage != nil || apiManager.costsErrorMessage != nil
+                            ? "Check the Admin API key and organization permissions in Settings."
+                            : "Add an Organization Admin API key in Settings to connect."))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 170, alignment: .topLeading)
+            .frame(height: 142, alignment: .topLeading)
             .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
 
             if let error = manager.errorMessage, manager.isConnected {
@@ -1102,16 +1215,94 @@ private struct OpenAIProviderView: View {
         .padding(.vertical, 8)
     }
 
-    private func apiMetric(_ title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+    private static func formatCurrency(_ value: Double) -> String {
+        "$\(String(format: "%.4f", value))"
+    }
+}
+
+private struct OpenAIMetricValue: Identifiable {
+    var id: String { label }
+    let label: String
+    let value: String
+    let details: [(String, String)]
+}
+
+private struct OpenAIMetricBlock: View {
+    let title: String
+    let metrics: [OpenAIMetricValue]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
             Text(title)
-                .font(.caption)
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            Text(value)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.primary)
+            HStack(alignment: .top, spacing: 8) {
+                ForEach(metrics) { metric in
+                    OpenAIMetricAmount(metric: metric)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(9)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
+    }
+}
+
+private struct OpenAIMetricAmount: View {
+    let metric: OpenAIMetricValue
+    @State private var showPopover = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(metric.label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text(metric.value)
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .onHover { showPopover = $0 }
+                .popover(isPresented: $showPopover) {
+                    OpenAIMetricPopover(metric: metric)
+                }
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+private struct OpenAIMetricPopover: View {
+    let metric: OpenAIMetricValue
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(metric.label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            if metric.details.isEmpty {
+                Text("No breakdown available")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(metric.details.enumerated()), id: \.offset) { _, detail in
+                    HStack(spacing: 8) {
+                        Text(detail.0)
+                            .font(.caption)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer(minLength: 4)
+                        Text(detail.1)
+                            .font(.caption.weight(.medium))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(width: 280)
     }
 }
 
