@@ -672,9 +672,9 @@ struct MenuBarView: View {
 
         var icon: String {
             switch self {
-            case .openRouter: "point.3.connected.trianglepath.dotted"
-            case .openAI: "sparkle"
-            case .antigravity: "arrow.up.right.and.arrow.down.left"
+            case .openRouter: ProviderIconName.openRouter
+            case .openAI: ProviderIconName.openAI
+            case .antigravity: ProviderIconName.antigravity
             }
         }
     }
@@ -864,7 +864,7 @@ struct MenuBarView: View {
         VStack(spacing: 8) {
             // Shared title bar
             HStack(spacing: 6) {
-                Image(systemName: "square.stack.3d.up")
+                Image(systemName: AppSymbolName.popupTitle)
                     .foregroundStyle(Color.accentColor)
                     .font(.system(size: 14))
                 Text("AI Provider Monitor")
