@@ -238,7 +238,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 enum ProviderIconName {
     static let openRouter = "point.3.connected.trianglepath.dotted"
     static let openAI = "sparkle"
-    static let antigravity = "arrow.up.right.and.arrow.down.left"
+    static let googleAI = "sparkles"
 }
 
 enum AppSymbolName {
@@ -249,13 +249,13 @@ struct MenuBarStatusGroup: Equatable {
     enum Provider: Equatable {
         case openRouter
         case openAI
-        case antigravity
+        case googleAI
 
         var iconName: String {
             switch self {
             case .openRouter: ProviderIconName.openRouter
             case .openAI: ProviderIconName.openAI
-            case .antigravity: ProviderIconName.antigravity
+            case .googleAI: ProviderIconName.googleAI
             }
         }
 
@@ -263,7 +263,7 @@ struct MenuBarStatusGroup: Equatable {
             switch self {
             case .openRouter: "OpenRouter"
             case .openAI: "OpenAI"
-            case .antigravity: "Antigravity"
+            case .googleAI: "Google AI"
             }
         }
 
@@ -271,7 +271,7 @@ struct MenuBarStatusGroup: Equatable {
             switch self {
             case .openRouter: 0xC8FE03
             case .openAI: 0x358AFF
-            case .antigravity: 0x9065B6
+            case .googleAI: 0x4285F4
             }
         }
     }
@@ -302,7 +302,7 @@ enum MenuBarStatusFormatter {
         openRouterCredit: Double?,
         chatGPTRemainingPercent: Int?,
         openAIPlatformCredit: Double?,
-        antigravityCredit: Double? = nil
+        googleAICredit: Double? = nil
     ) -> [MenuBarStatusGroup] {
         var groups: [MenuBarStatusGroup] = []
 
@@ -324,10 +324,10 @@ enum MenuBarStatusFormatter {
             groups.append(MenuBarStatusGroup(provider: .openAI, values: openAIValues))
         }
 
-        if let antigravityCredit {
+        if let googleAICredit {
             groups.append(MenuBarStatusGroup(
-                provider: .antigravity,
-                values: [formatCurrency(antigravityCredit)]
+                provider: .googleAI,
+                values: [formatCurrency(googleAICredit)]
             ))
         }
 

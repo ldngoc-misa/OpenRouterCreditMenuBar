@@ -666,7 +666,7 @@ struct MenuBarView: View {
     private enum ProviderTab: String, CaseIterable, Identifiable {
         case openRouter = "OpenRouter"
         case openAI = "OpenAI"
-        case antigravity = "Antigravity"
+        case googleAI = "Google AI"
 
         var id: String { rawValue }
 
@@ -674,7 +674,7 @@ struct MenuBarView: View {
             switch self {
             case .openRouter: ProviderIconName.openRouter
             case .openAI: ProviderIconName.openAI
-            case .antigravity: ProviderIconName.antigravity
+            case .googleAI: ProviderIconName.googleAI
             }
         }
     }
@@ -830,8 +830,8 @@ struct MenuBarView: View {
                 apiManager: openAIAPIManager,
                 platformManager: openAIPlatformLoginManager
             )
-        case .antigravity:
-            AntigravityProviderView()
+        case .googleAI:
+            GoogleAIProviderView()
         }
     }
 
@@ -881,7 +881,7 @@ struct MenuBarView: View {
                             ? chatGPTManager.isLoading || openAIAPIManager.isLoading
                             : false
                 )
-                .disabled(selectedProvider == .antigravity)
+                .disabled(selectedProvider == .googleAI)
 
                 if selectedProvider == .openRouter {
                     ToolbarButton(
@@ -933,7 +933,7 @@ struct MenuBarView: View {
             chatGPTManager.refresh()
             Task { await openAIAPIManager.refresh() }
             openAIPlatformLoginManager.refreshAccount()
-        case .antigravity:
+        case .googleAI:
             break
         }
     }
@@ -1306,12 +1306,12 @@ private struct OpenAIMetricPopover: View {
     }
 }
 
-private struct AntigravityProviderView: View {
+private struct GoogleAIProviderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Antigravity")
+                    Text("Google AI")
                         .font(.title2.weight(.semibold))
                     Text("Quota and usage")
                         .font(.subheadline)
@@ -1334,7 +1334,7 @@ private struct AntigravityProviderView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     ProgressView(value: 0)
-                        .tint(.purple)
+                        .tint(.blue)
                     HStack {
                         Label("Usage", systemImage: "chart.bar.fill")
                         Spacer()
@@ -1345,7 +1345,7 @@ private struct AntigravityProviderView: View {
                 }
                 .padding(18)
                 .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
-                .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                .background(Color.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
 
                 VStack(alignment: .leading, spacing: 14) {
                     Label("RESET SCHEDULE", systemImage: "clock.arrow.circlepath")
@@ -1363,7 +1363,7 @@ private struct AntigravityProviderView: View {
                     Text("Not connected")
                         .font(.subheadline)
                     Spacer(minLength: 0)
-                    Label("Antigravity quota details", systemImage: "sparkles")
+                    Label("Google AI quota details", systemImage: "sparkles")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -1372,7 +1372,7 @@ private struct AntigravityProviderView: View {
                 .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 14))
             }
 
-            Label("Connect Antigravity in Settings to show quota and reset information.", systemImage: "info.circle")
+            Label("Connect Google AI in Settings to show quota and reset information.", systemImage: "info.circle")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

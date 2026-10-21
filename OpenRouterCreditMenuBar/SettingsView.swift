@@ -213,7 +213,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Antigravity") {
+            Section("Google AI") {
                 LabeledContent("Account", value: "Not connected")
                 LabeledContent("Quota monitoring", value: "Not connected")
             }

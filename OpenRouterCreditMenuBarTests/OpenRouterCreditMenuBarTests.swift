@@ -25,17 +25,18 @@ struct OpenRouterCreditMenuBarTests {
             openRouterCredit: 15.3,
             chatGPTRemainingPercent: 83,
             openAIPlatformCredit: 8.64,
-            antigravityCredit: 2.4
+            googleAICredit: 2.4
         )
 
-        #expect(groups.map(\.provider) == [.openRouter, .openAI, .antigravity])
+        #expect(groups.map(\.provider) == [.openRouter, .openAI, .googleAI])
+        #expect(groups.map(\.provider.accessibilityName) == ["OpenRouter", "OpenAI", "Google AI"])
         #expect(groups.map(\.values) == [["$15"], ["83%", "$8.6"], ["$2.4"]])
         #expect(groups.map(\.provider.iconName) == [
             "point.3.connected.trianglepath.dotted",
             "sparkle",
-            "arrow.up.right.and.arrow.down.left"
+            "sparkles"
         ])
-        #expect(groups.map(\.provider.iconColorHex) == [0xC8FE03, 0x358AFF, 0x9065B6])
+        #expect(groups.map(\.provider.iconColorHex) == [0xC8FE03, 0x358AFF, 0x4285F4])
 
         let title = MenuBarStatusFormatter.attributedTitle(for: groups).string
         #expect(title.hasPrefix("{ "))
