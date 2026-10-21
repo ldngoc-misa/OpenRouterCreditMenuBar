@@ -5,7 +5,6 @@
 
 import Combine
 import Foundation
-import Security
 
 struct OpenAIAPIUsageByModel: Identifiable {
     var id: String { "\(projectID ?? "")-\(model)" }
@@ -47,8 +46,7 @@ final class OpenAIAPIManager: ObservableObject {
     @Published private(set) var usageByModel: [OpenAIAPIUsageByModel] = []
     @Published private(set) var costsByLineItem: [OpenAIAPICostBreakdown] = []
 
-    private let keychainService = Bundle.main.bundleIdentifier ?? "OpenRouterCreditMenuBar"
-    private let keychainAccount = "openai_admin_api_key"
+    private let userDefaults = UserDefaults.standard
     private var refreshTimer: Timer?
     private var refreshInterval: TimeInterval = {
         let interval = UserDefaults.standard.double(forKey: "refresh_interval")
@@ -56,10 +54,14 @@ final class OpenAIAPIManager: ObservableObject {
     }()
 
     var adminAPIKey: String {
-        get { readAPIKey() }
+        get { userDefaults.string(forKey: "openai_admin_api_key") ?? "" }
         set {
-            guard newValue != readAPIKey() else { return }
-            saveAPIKey(newValue)
+            guard newValue != adminAPIKey else { return }
+            if newValue.isEmpty {
+                userDefaults.removeObject(forKey: "openai_admin_api_key")
+            } else {
+                userDefaults.set(newValue, forKey: "openai_admin_api_key")
+            }
             isConnected = false
             lastUpdated = nil
             usageErrorMessage = nil
@@ -303,45 +305,6 @@ final class OpenAIAPIManager: ObservableObject {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let error = object["error"] as? [String: Any] else { return nil }
         return error["message"] as? String
-    }
-
-    private func readAPIKey() -> String {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: keychainAccount,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data,
-              let value = String(data: data, encoding: .utf8) else { return "" }
-        return value
-    }
-
-    private func saveAPIKey(_ value: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: keychainAccount
-        ]
-        guard !value.isEmpty else {
-            SecItemDelete(query as CFDictionary)
-            return
-        }
-
-        let data = Data(value.utf8)
-        let attributes: [String: Any] = [
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
-        ]
-        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-        if status == errSecItemNotFound {
-            var insert = query
-            attributes.forEach { insert[$0.key] = $0.value }
-            SecItemAdd(insert as CFDictionary, nil)
-        }
     }
 }
 
