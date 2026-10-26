@@ -667,15 +667,15 @@ struct MenuBarView: View {
     private enum ProviderTab: String, CaseIterable, Identifiable {
         case openRouter = "OpenRouter"
         case openAI = "OpenAI"
-        case googleAI = "Antigravity"
+        case googleAI = "Google AI"
 
         var id: String { rawValue }
 
-        var icon: String {
+        var icon: ProviderIcon {
             switch self {
-            case .openRouter: ProviderIconName.openRouter
-            case .openAI: ProviderIconName.openAI
-            case .googleAI: ProviderIconName.googleAI
+            case .openRouter: .symbol(ProviderIconName.openRouter)
+            case .openAI: .symbol(ProviderIconName.openAI)
+            case .googleAI: .asset(ProviderIconName.googleAI)
             }
         }
     }
@@ -842,7 +842,13 @@ struct MenuBarView: View {
                 Button {
                     selectedProvider = tab
                 } label: {
-                    Label(tab.rawValue, systemImage: tab.icon)
+                    Label {
+                        Text(tab.rawValue)
+                            .foregroundStyle(selectedProvider == tab ? Color.accentColor : Color.secondary)
+                    } icon: {
+                        tab.icon.swiftUIImage
+                            .foregroundStyle(providerTabIconColor(for: tab))
+                    }
                         .font(.system(size: 12, weight: selectedProvider == tab ? .semibold : .medium))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -850,7 +856,6 @@ struct MenuBarView: View {
                             RoundedRectangle(cornerRadius: 7)
                                 .fill(selectedProvider == tab ? Color.accentColor.opacity(0.2) : .clear)
                         }
-                        .foregroundStyle(selectedProvider == tab ? Color.accentColor : Color.secondary)
                         .contentShape(RoundedRectangle(cornerRadius: 7))
                 }
                 .buttonStyle(.plain)
@@ -859,6 +864,11 @@ struct MenuBarView: View {
         }
         .padding(4)
         .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 9))
+    }
+
+    private func providerTabIconColor(for tab: ProviderTab) -> Color {
+        guard selectedProvider == tab else { return .secondary }
+        return tab == .googleAI ? Color(hex: "9065B6") : .accentColor
     }
 
     var body: some View {
@@ -1325,7 +1335,7 @@ private struct GoogleAIProviderView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Antigravity")
+                    Text("Google AI")
                         .font(.title2.weight(.semibold))
                     Text("Shared weekly quota and prompt credits")
                         .font(.subheadline)

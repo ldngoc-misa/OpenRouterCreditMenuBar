@@ -393,8 +393,14 @@ enum AntigravityQuotaParser {
                   let model = modelOrAlias["model"] as? String, !model.isEmpty,
                   let quotaInfo = config["quotaInfo"] as? [String: Any],
                   let remaining = number(quotaInfo["remainingFraction"]), remaining.isFinite else { return nil }
-            let aliases = ["alias", "displayName", "name", "title"]
-                .compactMap { modelOrAlias[$0] as? String }
+            let aliases = [
+                config["label"] as? String,
+                modelOrAlias["alias"] as? String,
+                modelOrAlias["displayName"] as? String,
+                modelOrAlias["name"] as? String,
+                modelOrAlias["title"] as? String
+            ]
+                .compactMap { $0 }
                 .filter { !$0.isEmpty && $0.localizedCaseInsensitiveCompare(model) != .orderedSame }
             return AntigravityModelQuota(
                 id: model,

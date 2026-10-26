@@ -244,7 +244,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 enum ProviderIconName {
     static let openRouter = "point.3.connected.trianglepath.dotted"
     static let openAI = "sparkle"
-    static let googleAI = "sparkles"
+    static let googleAI = "AntigravityProviderIcon"
+    static let googleAIColorHex: UInt32 = 0x9065B6
+}
+
+enum ProviderIcon: Equatable {
+    case symbol(String)
+    case asset(String)
+
+    @ViewBuilder
+    var swiftUIImage: some View {
+        switch self {
+        case .symbol(let name): Image(systemName: name)
+        case .asset(let name):
+            Image(name)
+                .renderingMode(.template)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 13, height: 13)
+        }
+    }
 }
 
 enum AppSymbolName {
@@ -257,11 +276,11 @@ struct MenuBarStatusGroup: Equatable {
         case openAI
         case googleAI
 
-        var iconName: String {
+        var icon: ProviderIcon {
             switch self {
-            case .openRouter: ProviderIconName.openRouter
-            case .openAI: ProviderIconName.openAI
-            case .googleAI: ProviderIconName.googleAI
+            case .openRouter: .symbol(ProviderIconName.openRouter)
+            case .openAI: .symbol(ProviderIconName.openAI)
+            case .googleAI: .asset(ProviderIconName.googleAI)
             }
         }
 
@@ -269,7 +288,7 @@ struct MenuBarStatusGroup: Equatable {
             switch self {
             case .openRouter: "OpenRouter"
             case .openAI: "OpenAI"
-            case .googleAI: "Antigravity"
+            case .googleAI: "Google AI"
             }
         }
 
@@ -277,7 +296,7 @@ struct MenuBarStatusGroup: Equatable {
             switch self {
             case .openRouter: 0xC8FE03
             case .openAI: 0x358AFF
-            case .googleAI: 0x4285F4
+            case .googleAI: ProviderIconName.googleAIColorHex
             }
         }
     }
@@ -358,7 +377,7 @@ enum MenuBarStatusFormatter {
                 ))
             }
 
-            if let image = tintedSymbolImage(for: group.provider) {
+            if let image = tintedProviderImage(for: group.provider) {
                 let attachment = NSTextAttachment()
                 attachment.image = image
                 attachment.bounds = CGRect(x: 0, y: -2, width: 13, height: 13)
@@ -375,18 +394,26 @@ enum MenuBarStatusFormatter {
         return title
     }
 
-    private static func tintedSymbolImage(for provider: MenuBarStatusGroup.Provider) -> NSImage? {
-        guard let symbol = NSImage(
-            systemSymbolName: provider.iconName,
-            accessibilityDescription: provider.accessibilityName
-        )?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)) else {
-            return nil
+    private static func tintedProviderImage(for provider: MenuBarStatusGroup.Provider) -> NSImage? {
+        let sourceImage: NSImage
+        switch provider.icon {
+        case .symbol(let name):
+            guard let symbol = NSImage(
+                systemSymbolName: name,
+                accessibilityDescription: provider.accessibilityName
+            )?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)) else {
+                return nil
+            }
+            sourceImage = symbol
+        case .asset(let name):
+            guard let asset = NSImage(named: name) else { return nil }
+            sourceImage = asset
         }
 
-        let bounds = NSRect(origin: .zero, size: symbol.size)
-        let image = NSImage(size: symbol.size)
+        let bounds = NSRect(origin: .zero, size: sourceImage.size)
+        let image = NSImage(size: sourceImage.size)
         image.lockFocus()
-        symbol.draw(in: bounds, from: bounds, operation: .sourceOver, fraction: 1)
+        sourceImage.draw(in: bounds, from: bounds, operation: .sourceOver, fraction: 1)
         if let context = NSGraphicsContext.current?.cgContext {
             context.saveGState()
             context.setBlendMode(.sourceAtop)

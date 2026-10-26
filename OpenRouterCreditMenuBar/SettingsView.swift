@@ -215,7 +215,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Antigravity") {
+            Section("Google AI") {
                 LabeledContent("Quota source", value: "agy /usage + language server")
                 LabeledContent(
                     "Status",

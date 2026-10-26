@@ -50,9 +50,33 @@ struct OpenRouterCreditMenuBarTests {
         #expect(snapshot.monthlyPromptCredits == 100)
         #expect(snapshot.models.map(\.id) == ["model-a", "model-b"])
         #expect(snapshot.models.map(\.remainingPercent) == [25, 40])
+        #expect(snapshot.models.first?.displayName == "model-a")
         #expect(snapshot.models.last?.displayName == "Model B")
         #expect(snapshot.models.allSatisfy { $0.resetTime != nil })
         #expect(snapshot.lowestQuotaRemainingPercent == 25)
+    }
+
+    @Test func antigravityParserUsesConfigLabelForPlaceholderModel() throws {
+        let data = Data("""
+        {
+          "userStatus": {
+            "cascadeModelConfigData": {
+              "clientModelConfigs": [
+                {
+                  "label": "Gemini 3 Pro (High)",
+                  "modelOrAlias": { "model": "MODEL_PLACEHOLDER_M7" },
+                  "quotaInfo": { "remainingFraction": 0.75 }
+                }
+              ]
+            }
+          }
+        }
+        """.utf8)
+
+        let snapshot = try AntigravityQuotaParser.parse(data)
+
+        #expect(snapshot.models.first?.id == "MODEL_PLACEHOLDER_M7")
+        #expect(snapshot.models.first?.displayName == "Gemini 3 Pro (High)")
     }
 
     @Test func antigravityParserAcceptsRootStatusAndMissingOptionalFields() throws {
@@ -204,14 +228,14 @@ struct OpenRouterCreditMenuBarTests {
         )
 
         #expect(groups.map(\.provider) == [.openRouter, .openAI, .googleAI])
-        #expect(groups.map(\.provider.accessibilityName) == ["OpenRouter", "OpenAI", "Antigravity"])
+        #expect(groups.map(\.provider.accessibilityName) == ["OpenRouter", "OpenAI", "Google AI"])
         #expect(groups.map(\.values) == [["$15"], ["83%", "$8.6"], ["24%"]])
-        #expect(groups.map(\.provider.iconName) == [
-            "point.3.connected.trianglepath.dotted",
-            "sparkle",
-            "sparkles"
+        #expect(groups.map(\.provider.icon) == [
+            .symbol("point.3.connected.trianglepath.dotted"),
+            .symbol("sparkle"),
+            .asset("AntigravityProviderIcon")
         ])
-        #expect(groups.map(\.provider.iconColorHex) == [0xC8FE03, 0x358AFF, 0x4285F4])
+        #expect(groups.map(\.provider.iconColorHex) == [0xC8FE03, 0x358AFF, 0x9065B6])
 
         let title = MenuBarStatusFormatter.attributedTitle(for: groups).string
         #expect(title.hasPrefix("{ "))
