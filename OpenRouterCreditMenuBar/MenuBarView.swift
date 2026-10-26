@@ -666,6 +666,7 @@ struct MenuBarView: View {
 
     private enum ProviderTab: String, CaseIterable, Identifiable {
         case openRouter = "OpenRouter"
+        case chatGPT = "ChatGPT"
         case openAI = "OpenAI"
         case googleAI = "Google AI"
 
@@ -674,6 +675,7 @@ struct MenuBarView: View {
         var icon: ProviderIcon {
             switch self {
             case .openRouter: .symbol(ProviderIconName.openRouter)
+            case .chatGPT: .symbol(ProviderIconName.chatGPT)
             case .openAI: .symbol(ProviderIconName.openAI)
             case .googleAI: .asset(ProviderIconName.googleAI)
             }
@@ -825,9 +827,10 @@ struct MenuBarView: View {
         switch selectedProvider {
         case .openRouter:
             openRouterDashboard
+        case .chatGPT:
+            ChatGPTProviderView(manager: chatGPTManager)
         case .openAI:
             OpenAIProviderView(
-                manager: chatGPTManager,
                 apiManager: openAIAPIManager,
                 platformManager: openAIPlatformLoginManager
             )
@@ -846,7 +849,7 @@ struct MenuBarView: View {
                         Text(tab.rawValue)
                             .foregroundStyle(selectedProvider == tab ? Color.accentColor : Color.secondary)
                     } icon: {
-                        tab.icon.swiftUIImage
+                        tab.icon.swiftUIImage()
                             .foregroundStyle(providerTabIconColor(for: tab))
                     }
                         .font(.system(size: 12, weight: selectedProvider == tab ? .semibold : .medium))
@@ -867,8 +870,35 @@ struct MenuBarView: View {
     }
 
     private func providerTabIconColor(for tab: ProviderTab) -> Color {
-        guard selectedProvider == tab else { return .secondary }
-        return tab == .googleAI ? Color(hex: "9065B6") : .accentColor
+        switch tab {
+        case .openRouter:
+            return ProviderIconColor.swiftUIColor(hex: ProviderIconColor.openRouter)
+        case .chatGPT:
+            return ProviderIconColor.swiftUIColor(hex: ProviderIconColor.chatGPT)
+        case .openAI:
+            return ProviderIconColor.swiftUIColor(hex: ProviderIconColor.openAI)
+        case .googleAI:
+            return ProviderIconColor.swiftUIColor(hex: ProviderIconColor.googleAI)
+        }
+    }
+
+    private var selectedProviderUsageURL: URL? {
+        switch selectedProvider {
+        case .openRouter:
+            URL(string: "https://openrouter.ai/activity")
+        case .chatGPT:
+            URL(string: "https://chatgpt.com/settings/usage")
+        case .openAI:
+            URL(string: "https://platform.openai.com/settings/organization/usage")
+        case .googleAI:
+            URL(string: "https://aistudio.google.com/usage")
+        }
+    }
+
+    private var selectedProviderUsageTooltip: String {
+        selectedProvider == .openRouter
+            ? "View OpenRouter Activity"
+            : "View \(selectedProvider.rawValue) Usage"
     }
 
     var body: some View {
@@ -878,7 +908,7 @@ struct MenuBarView: View {
                 Image(systemName: AppSymbolName.popupTitle)
                     .foregroundStyle(Color.accentColor)
                     .font(.system(size: 14))
-                Text("AI Provider Monitor")
+                Text("AI Credit Monitor")
                     .font(.system(size: 13, weight: .medium))
                 Spacer()
 
@@ -888,19 +918,19 @@ struct MenuBarView: View {
                     action: refreshSelectedProvider,
                     isLoading: selectedProvider == .openRouter
                         ? creditManager.isLoading
-                        : selectedProvider == .openAI
-                            ? chatGPTManager.isLoading || openAIAPIManager.isLoading
-                            : antigravityManager.isLoading
+                        : selectedProvider == .chatGPT
+                            ? chatGPTManager.isLoading
+                            : selectedProvider == .openAI
+                                ? openAIAPIManager.isLoading || openAIPlatformLoginManager.isLoading
+                                : antigravityManager.isLoading
                 )
 
-                if selectedProvider == .openRouter {
-                    ToolbarButton(
-                        systemName: "globe",
-                        tooltip: "View OpenRouter Activity"
-                    ) {
-                        if let url = URL(string: "https://openrouter.ai/activity") {
-                            NSWorkspace.shared.open(url)
-                        }
+                ToolbarButton(
+                    systemName: "globe",
+                    tooltip: selectedProviderUsageTooltip
+                ) {
+                    if let url = selectedProviderUsageURL {
+                        NSWorkspace.shared.open(url)
                     }
                 }
 
@@ -939,8 +969,9 @@ struct MenuBarView: View {
                     appDelegate.updateMenuBarTitle()
                 }
             }
-        case .openAI:
+        case .chatGPT:
             chatGPTManager.refresh()
+        case .openAI:
             Task { await openAIAPIManager.refresh() }
             openAIPlatformLoginManager.refreshAccount()
         case .googleAI:
@@ -949,17 +980,15 @@ struct MenuBarView: View {
     }
 }
 
-private struct OpenAIProviderView: View {
+private struct ChatGPTProviderView: View {
     @ObservedObject var manager: ChatGPTManager
-    @ObservedObject var apiManager: OpenAIAPIManager
-    @ObservedObject var platformManager: OpenAIPlatformLoginManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("OpenAI")
+                        Text("ChatGPT")
                             .font(.title2.weight(.semibold))
                         if let lastUpdated = manager.lastUpdated {
                             Text("Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))")
@@ -978,10 +1007,6 @@ private struct OpenAIProviderView: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Label("CHATGPT", systemImage: "sparkle")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
                 HStack(alignment: .top, spacing: 10) {
                     VStack(alignment: .leading, spacing: 5) {
                         Label("Account", systemImage: "person.crop.circle")
@@ -1095,8 +1120,49 @@ private struct OpenAIProviderView: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 170, alignment: .topLeading)
+            .frame(maxHeight: .infinity, alignment: .topLeading)
             .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
+
+            if let error = manager.errorMessage, manager.isConnected {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+private struct OpenAIProviderView: View {
+    @ObservedObject var apiManager: OpenAIAPIManager
+    @ObservedObject var platformManager: OpenAIPlatformLoginManager
+
+    private var isConnected: Bool {
+        apiManager.isConnected || platformManager.isConnected
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("OpenAI")
+                            .font(.title2.weight(.semibold))
+                        if let lastUpdated = apiManager.lastUpdated {
+                            Text("Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    Text("Platform API usage and credit")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Label(isConnected ? "Connected" : "Not connected", systemImage: isConnected ? "checkmark.circle.fill" : "circle.dashed")
+                    .font(.caption)
+                    .foregroundStyle(isConnected ? .green : .secondary)
+            }
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
@@ -1213,15 +1279,10 @@ private struct OpenAIProviderView: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 142, alignment: .topLeading)
+            .frame(maxHeight: .infinity, alignment: .topLeading)
             .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
-
-            if let error = manager.errorMessage, manager.isConnected {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
         }
+        .frame(maxHeight: .infinity, alignment: .topLeading)
         .padding(.vertical, 8)
     }
 

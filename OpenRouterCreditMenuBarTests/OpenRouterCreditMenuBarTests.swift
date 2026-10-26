@@ -227,21 +227,22 @@ struct OpenRouterCreditMenuBarTests {
             antigravityRemainingPercent: 24
         )
 
-        #expect(groups.map(\.provider) == [.openRouter, .openAI, .googleAI])
-        #expect(groups.map(\.provider.accessibilityName) == ["OpenRouter", "OpenAI", "Google AI"])
-        #expect(groups.map(\.values) == [["$15"], ["83%", "$8.6"], ["24%"]])
+        #expect(groups.map(\.provider) == [.openRouter, .chatGPT, .openAI, .googleAI])
+        #expect(groups.map(\.provider.accessibilityName) == ["OpenRouter", "ChatGPT", "OpenAI", "Google AI"])
+        #expect(groups.map(\.values) == [["$15"], ["83%"], ["$8.6"], ["24%"]])
         #expect(groups.map(\.provider.icon) == [
             .symbol("point.3.connected.trianglepath.dotted"),
-            .symbol("sparkle"),
+            .symbol("bubble.left"),
+            .symbol("terminal"),
             .asset("AntigravityProviderIcon")
         ])
-        #expect(groups.map(\.provider.iconColorHex) == [0xC8FE03, 0x358AFF, 0x9065B6])
+        #expect(groups.map(\.provider.iconColorHex) == [0xC8FE03, 0x71D6B5, 0x358AFF, 0x9065B6])
 
         let title = MenuBarStatusFormatter.attributedTitle(for: groups).string
         #expect(title.hasPrefix("{ "))
         #expect(title.hasSuffix(" }"))
-        #expect(title.contains("  |  "))
-        #expect(title.components(separatedBy: "|").count == 3)
+        #expect(title.contains("●"))
+        #expect(title.components(separatedBy: "●").count == 4)
     }
 
     @Test func menuBarOmitsGroupsWithoutAvailableDataAndKeepsOpenAIMetricsIndependent() {
@@ -250,9 +251,9 @@ struct OpenRouterCreditMenuBarTests {
             chatGPTRemainingPercent: 83,
             openAIPlatformCredit: nil
         )
-        #expect(onlyChatGPT.map(\.provider) == [.openAI])
+        #expect(onlyChatGPT.map(\.provider) == [.chatGPT])
         #expect(onlyChatGPT.first?.values == ["83%"])
-        #expect(!MenuBarStatusFormatter.attributedTitle(for: onlyChatGPT).string.contains("|"))
+        #expect(!MenuBarStatusFormatter.attributedTitle(for: onlyChatGPT).string.contains("●"))
 
         let onlyPlatform = MenuBarStatusFormatter.makeGroups(
             openRouterCredit: nil,

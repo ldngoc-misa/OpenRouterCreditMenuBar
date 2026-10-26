@@ -202,7 +202,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func fallbackMenuBarImage() -> NSImage? {
         let image = NSImage(
             systemSymbolName: AppSymbolName.popupTitle,
-            accessibilityDescription: "AI Provider Monitor"
+            accessibilityDescription: "AI Credit Monitor"
         )?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 14, weight: .medium))
         image?.isTemplate = true
         return image
@@ -243,9 +243,35 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
 enum ProviderIconName {
     static let openRouter = "point.3.connected.trianglepath.dotted"
-    static let openAI = "sparkle"
+    static let chatGPT = "bubble.left"
+    static let openAI = "terminal"
     static let googleAI = "AntigravityProviderIcon"
-    static let googleAIColorHex: UInt32 = 0x9065B6
+}
+
+enum ProviderIconColor {
+    static let openRouter: UInt32 = 0xC8FE03
+    static let chatGPT: UInt32 = 0x71D6B5
+    static let openAI: UInt32 = 0x358AFF
+    static let googleAI: UInt32 = 0x9065B6
+
+    static func swiftUIColor(hex: UInt32) -> Color {
+        Color(
+            .sRGB,
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255,
+            opacity: 1
+        )
+    }
+
+    static func nsColor(hex: UInt32) -> NSColor {
+        NSColor(
+            srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: 1
+        )
+    }
 }
 
 enum ProviderIcon: Equatable {
@@ -253,15 +279,17 @@ enum ProviderIcon: Equatable {
     case asset(String)
 
     @ViewBuilder
-    var swiftUIImage: some View {
+    func swiftUIImage(size: CGFloat = 13) -> some View {
         switch self {
-        case .symbol(let name): Image(systemName: name)
+        case .symbol(let name):
+            Image(systemName: name)
+                .font(.system(size: size, weight: .regular))
         case .asset(let name):
             Image(name)
                 .renderingMode(.template)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 13, height: 13)
+                .frame(width: size, height: size)
         }
     }
 }
@@ -273,12 +301,14 @@ enum AppSymbolName {
 struct MenuBarStatusGroup: Equatable {
     enum Provider: Equatable {
         case openRouter
+        case chatGPT
         case openAI
         case googleAI
 
         var icon: ProviderIcon {
             switch self {
             case .openRouter: .symbol(ProviderIconName.openRouter)
+            case .chatGPT: .symbol(ProviderIconName.chatGPT)
             case .openAI: .symbol(ProviderIconName.openAI)
             case .googleAI: .asset(ProviderIconName.googleAI)
             }
@@ -287,6 +317,7 @@ struct MenuBarStatusGroup: Equatable {
         var accessibilityName: String {
             switch self {
             case .openRouter: "OpenRouter"
+            case .chatGPT: "ChatGPT"
             case .openAI: "OpenAI"
             case .googleAI: "Google AI"
             }
@@ -294,9 +325,10 @@ struct MenuBarStatusGroup: Equatable {
 
         var iconColorHex: UInt32 {
             switch self {
-            case .openRouter: 0xC8FE03
-            case .openAI: 0x358AFF
-            case .googleAI: ProviderIconName.googleAIColorHex
+            case .openRouter: ProviderIconColor.openRouter
+            case .chatGPT: ProviderIconColor.chatGPT
+            case .openAI: ProviderIconColor.openAI
+            case .googleAI: ProviderIconColor.googleAI
             }
         }
     }
@@ -338,15 +370,17 @@ enum MenuBarStatusFormatter {
             ))
         }
 
-        var openAIValues: [String] = []
         if let chatGPTRemainingPercent {
-            openAIValues.append("\(chatGPTRemainingPercent)%")
+            groups.append(MenuBarStatusGroup(
+                provider: .chatGPT,
+                values: ["\(chatGPTRemainingPercent)%"]
+            ))
         }
         if let openAIPlatformCredit {
-            openAIValues.append(formatCurrency(openAIPlatformCredit))
-        }
-        if !openAIValues.isEmpty {
-            groups.append(MenuBarStatusGroup(provider: .openAI, values: openAIValues))
+            groups.append(MenuBarStatusGroup(
+                provider: .openAI,
+                values: [formatCurrency(openAIPlatformCredit)]
+            ))
         }
 
         if let antigravityRemainingPercent {
@@ -368,13 +402,17 @@ enum MenuBarStatusFormatter {
 
         for (index, group) in groups.enumerated() {
             if index > 0 {
-                title.append(NSAttributedString(
-                    string: "  |  ",
+                let separator = NSMutableAttributedString(string: "  ", attributes: [.font: font])
+                separator.append(NSAttributedString(
+                    string: "●",
                     attributes: [
-                        .font: font,
-                        .foregroundColor: NSColor.tertiaryLabelColor.withAlphaComponent(0.75)
+                        .font: NSFont.systemFont(ofSize: 5.5, weight: .regular),
+                        .baselineOffset: 2,
+                        .foregroundColor: NSColor.tertiaryLabelColor.withAlphaComponent(0.45)
                     ]
                 ))
+                separator.append(NSAttributedString(string: "  ", attributes: [.font: font]))
+                title.append(separator)
             }
 
             if let image = tintedProviderImage(for: group.provider) {
@@ -417,7 +455,7 @@ enum MenuBarStatusFormatter {
         if let context = NSGraphicsContext.current?.cgContext {
             context.saveGState()
             context.setBlendMode(.sourceAtop)
-            context.setFillColor(color(fromHex: provider.iconColorHex).cgColor)
+            context.setFillColor(ProviderIconColor.nsColor(hex: provider.iconColorHex).cgColor)
             context.fill(bounds)
             context.restoreGState()
         }
@@ -426,12 +464,4 @@ enum MenuBarStatusFormatter {
         return image
     }
 
-    private static func color(fromHex hex: UInt32) -> NSColor {
-        NSColor(
-            calibratedRed: CGFloat((hex >> 16) & 0xFF) / 255,
-            green: CGFloat((hex >> 8) & 0xFF) / 255,
-            blue: CGFloat(hex & 0xFF) / 255,
-            alpha: 1
-        )
-    }
 }

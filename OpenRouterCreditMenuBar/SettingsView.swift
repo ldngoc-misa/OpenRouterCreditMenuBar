@@ -59,7 +59,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("OpenRouter") {
+            Section {
                 SecureField("OpenRouter API Key", text: $apiKey)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: apiKey) { _, newValue in
@@ -85,13 +85,19 @@ struct SettingsView: View {
                         .foregroundStyle(.green)
                     }
                 }
+            } header: {
+                providerSectionHeader(
+                    "OpenRouter",
+                    icon: .symbol(ProviderIconName.openRouter),
+                    color: ProviderIconColor.swiftUIColor(hex: ProviderIconColor.openRouter)
+                )
             }
 
-            Section("OpenAI") {
-                SettingsGroupCard(title: "ChatGPT", systemImage: "person.crop.circle") {
+            Section {
+                SettingsGroupCard(title: "Account", systemImage: "person.crop.circle") {
                     VStack(alignment: .leading, spacing: 10) {
                         LabeledContent(
-                            "Account",
+                            "Signed in as",
                             value: chatGPTManager.accountEmail
                                 ?? (chatGPTManager.isConnected ? "Email unavailable" : "Not connected")
                         )
@@ -122,7 +128,15 @@ struct SettingsView: View {
                         }
                     }
                 }
+            } header: {
+                providerSectionHeader(
+                    "ChatGPT",
+                    icon: .symbol(ProviderIconName.chatGPT),
+                    color: ProviderIconColor.swiftUIColor(hex: ProviderIconColor.chatGPT)
+                )
+            }
 
+            Section {
                 SettingsGroupCard(title: "Platform API", systemImage: "chart.bar.xaxis") {
                     VStack(alignment: .leading, spacing: 10) {
                         SecureField("Admin API key", text: $openAIAdminAPIKey)
@@ -213,9 +227,15 @@ struct SettingsView: View {
                         }
                     }
                 }
+            } header: {
+                providerSectionHeader(
+                    "OpenAI",
+                    icon: .symbol(ProviderIconName.openAI),
+                    color: ProviderIconColor.swiftUIColor(hex: ProviderIconColor.openAI)
+                )
             }
 
-            Section("Google AI") {
+            Section {
                 LabeledContent("Quota source", value: "agy /usage + language server")
                 LabeledContent(
                     "Status",
@@ -240,6 +260,12 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
+            } header: {
+                providerSectionHeader(
+                    "Google AI",
+                    icon: .asset(ProviderIconName.googleAI),
+                    color: ProviderIconColor.swiftUIColor(hex: ProviderIconColor.googleAI)
+                )
             }
 
             if let error = creditManager.errorMessage {
@@ -272,6 +298,14 @@ struct SettingsView: View {
         openAtLogin = SMAppService.mainApp.status == .enabled
         openAIAPIManager.setRefreshInterval(refreshInterval)
         antigravityManager.setRefreshInterval(refreshInterval)
+    }
+
+    private func providerSectionHeader(_ title: String, icon: ProviderIcon, color: Color) -> some View {
+        HStack(spacing: 6) {
+            icon.swiftUIImage(size: 16)
+                .foregroundStyle(color)
+            Text(title)
+        }
     }
 
     private func setLoginItemEnabled(_ enabled: Bool) {
@@ -311,7 +345,6 @@ private struct SettingsGroupCard<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
