@@ -12,6 +12,7 @@ struct SettingsView: View {
     @EnvironmentObject var chatGPTManager: ChatGPTManager
     @EnvironmentObject var openAIAPIManager: OpenAIAPIManager
     @EnvironmentObject var openAIPlatformLoginManager: OpenAIPlatformLoginManager
+    @EnvironmentObject var antigravityManager: AntigravityManager
     @State private var apiKey: String = ""
     @State private var openAIAdminAPIKey: String = ""
     @State private var isEnabled: Bool = true
@@ -54,6 +55,7 @@ struct SettingsView: View {
                     creditManager.refreshInterval = newValue
                     chatGPTManager.setRefreshInterval(newValue)
                     openAIAPIManager.setRefreshInterval(newValue)
+                    antigravityManager.setRefreshInterval(newValue)
                 }
             }
 
@@ -213,9 +215,31 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Google AI") {
-                LabeledContent("Account", value: "Not connected")
-                LabeledContent("Quota monitoring", value: "Not connected")
+            Section("Antigravity") {
+                LabeledContent("Quota source", value: "agy /usage + language server")
+                LabeledContent(
+                    "Status",
+                    value: antigravityManager.isLoading
+                        ? "Checking…"
+                        : antigravityManager.snapshot == nil ? "Not detected" : "Connected"
+                )
+                if let lastUpdated = antigravityManager.lastUpdated {
+                    LabeledContent("Last updated", value: lastUpdated.formatted(date: .abbreviated, time: .shortened))
+                }
+                HStack {
+                    Button("Refresh") {
+                        Task { await antigravityManager.refresh() }
+                    }
+                    .disabled(antigravityManager.isLoading)
+                    if antigravityManager.isLoading {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                if let error = antigravityManager.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             }
 
             if let error = creditManager.errorMessage {
@@ -247,6 +271,7 @@ struct SettingsView: View {
         refreshInterval = creditManager.refreshInterval
         openAtLogin = SMAppService.mainApp.status == .enabled
         openAIAPIManager.setRefreshInterval(refreshInterval)
+        antigravityManager.setRefreshInterval(refreshInterval)
     }
 
     private func setLoginItemEnabled(_ enabled: Bool) {

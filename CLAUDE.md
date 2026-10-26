@@ -30,6 +30,9 @@ task debug-info           # Show Xcode version, schemes, destinations
 
 #Run app
 open ./build/Build/Products/Release/OpenRouterCreditMenuBar.app
+
+#Kill app
+pkill -x "OpenRouterCreditMenuBar" || true
 ```
 
 ### Build & Run (via Xcode)

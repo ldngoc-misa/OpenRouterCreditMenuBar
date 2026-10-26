@@ -661,12 +661,13 @@ struct MenuBarView: View {
     @EnvironmentObject var chatGPTManager: ChatGPTManager
     @EnvironmentObject var openAIAPIManager: OpenAIAPIManager
     @EnvironmentObject var openAIPlatformLoginManager: OpenAIPlatformLoginManager
+    @EnvironmentObject var antigravityManager: AntigravityManager
     @State private var selectedProvider: ProviderTab = .openRouter
 
     private enum ProviderTab: String, CaseIterable, Identifiable {
         case openRouter = "OpenRouter"
         case openAI = "OpenAI"
-        case googleAI = "Google AI"
+        case googleAI = "Antigravity"
 
         var id: String { rawValue }
 
@@ -831,7 +832,7 @@ struct MenuBarView: View {
                 platformManager: openAIPlatformLoginManager
             )
         case .googleAI:
-            GoogleAIProviderView()
+            GoogleAIProviderView(manager: antigravityManager)
         }
     }
 
@@ -879,9 +880,8 @@ struct MenuBarView: View {
                         ? creditManager.isLoading
                         : selectedProvider == .openAI
                             ? chatGPTManager.isLoading || openAIAPIManager.isLoading
-                            : false
+                            : antigravityManager.isLoading
                 )
-                .disabled(selectedProvider == .googleAI)
 
                 if selectedProvider == .openRouter {
                     ToolbarButton(
@@ -934,7 +934,7 @@ struct MenuBarView: View {
             Task { await openAIAPIManager.refresh() }
             openAIPlatformLoginManager.refreshAccount()
         case .googleAI:
-            break
+            Task { await antigravityManager.refresh() }
         }
     }
 }
@@ -1307,76 +1307,240 @@ private struct OpenAIMetricPopover: View {
 }
 
 private struct GoogleAIProviderView: View {
+    @ObservedObject var manager: AntigravityManager
+
+    private var models: [AntigravityModelQuota] {
+        manager.snapshot?.models ?? []
+    }
+
+    private var groups: [AntigravityQuotaGroup] {
+        manager.snapshot?.groups ?? []
+    }
+
+    private var nextReset: Date? {
+        (groups.compactMap(\.resetTime) + models.compactMap(\.resetTime)).min()
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Google AI")
+                    Text("Antigravity")
                         .font(.title2.weight(.semibold))
-                    Text("Quota and usage")
+                    Text("Shared weekly quota and prompt credits")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Label("Not connected", systemImage: "circle.dashed")
+                Label(
+                    manager.snapshot == nil ? "Not detected" : "Connected",
+                    systemImage: manager.snapshot == nil ? "circle.dashed" : "checkmark.circle.fill"
+                )
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(manager.snapshot == nil ? Color.secondary : Color.green)
             }
 
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("AVAILABLE QUOTA")
+                    Text("PROMPT CREDITS")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text("—")
-                        .font(.system(size: 38, weight: .semibold, design: .rounded))
-                    Text("Connect an account to view quota")
+                    Text(creditText(manager.snapshot?.availablePromptCredits))
+                        .font(.system(size: 32, weight: .semibold, design: .rounded))
+                    Text("available of \(creditText(manager.snapshot?.monthlyPromptCredits)) monthly")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    ProgressView(value: 0)
-                        .tint(.blue)
-                    HStack {
-                        Label("Usage", systemImage: "chart.bar.fill")
-                        Spacer()
-                        Text("Unavailable")
+                    if let snapshot = manager.snapshot,
+                       let available = snapshot.availablePromptCredits,
+                       let monthly = snapshot.monthlyPromptCredits,
+                       monthly > 0 {
+                        ProgressView(value: min(max(available / monthly, 0), 1))
+                            .tint(.blue)
+                    } else {
+                        ProgressView(value: 0)
+                            .tint(.blue)
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    if let usedCredits = usedPromptCredits {
+                        Text("\(creditText(usedCredits)) used")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Prompt credits")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .padding(18)
-                .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
+                .padding(16)
+                .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
                 .background(Color.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
 
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("RESET SCHEDULE", systemImage: "clock.arrow.circlepath")
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("NEXT RESET", systemImage: "clock.arrow.circlepath")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text("Next reset")
-                        .font(.headline)
-                    Text("Unavailable")
-                        .font(.title3.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    Divider()
-                    Text("Account")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("Not connected")
-                        .font(.subheadline)
-                    Spacer(minLength: 0)
-                    Label("Google AI quota details", systemImage: "sparkles")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                    if let nextReset {
+                        Text(nextReset.formatted(date: .abbreviated, time: .shortened))
+                            .font(.title3.weight(.medium))
+                    } else {
+                        Text("Unavailable")
+                            .font(.title3.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    if let lastUpdated = manager.lastUpdated {
+                        Text("Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
-                .padding(18)
-                .frame(minWidth: 230, maxWidth: 230, minHeight: 230, alignment: .topLeading)
+                .padding(16)
+                .frame(minWidth: 230, maxWidth: 230, minHeight: 130, alignment: .topLeading)
                 .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 14))
             }
 
-            Label("Connect Google AI in Settings to show quota and reset information.", systemImage: "info.circle")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack {
+                Text("SHARED WEEKLY QUOTAS")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if manager.isLoading { ProgressView().controlSize(.small) }
+                Text("\(groups.count)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            if groups.isEmpty, models.isEmpty {
+                ContentUnavailableView {
+                    Label("No model quota data", systemImage: "sparkles")
+                } description: {
+                    Text(manager.isLoading ? "Reading local quota…" : "Start Antigravity to read its local quota.")
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        if !groups.isEmpty {
+                            ForEach(groups) { group in
+                                weeklyQuotaCard(group)
+                            }
+                            Text("Quota is shared within each group and weighted by token cost.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        if !models.isEmpty {
+                            HStack {
+                                Text("MODEL DETAILS")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(models.count)")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.top, 2)
+                        }
+
+                        ForEach(models) { model in
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(model.displayName)
+                                        .font(.callout.weight(.medium))
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                    if model.displayName != model.id {
+                                        Text(model.id)
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                            .lineLimit(1)
+                                            .truncationMode(.middle)
+                                    }
+                                    Text(model.resetTime.map {
+                                        "Resets \($0.formatted(date: .abbreviated, time: .shortened))"
+                                    } ?? "Reset time unavailable")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 8)
+                                ProgressView(value: model.remainingFraction)
+                                    .tint(.blue)
+                                    .frame(width: 90)
+                                Text("\(model.remainingPercent)%")
+                                    .font(.callout.monospacedDigit().weight(.semibold))
+                                    .frame(width: 48, alignment: .trailing)
+                            }
+                            .padding(10)
+                            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 9))
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+
+            if let warning = manager.snapshot?.warningMessage {
+                Label(warning, systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let error = manager.errorMessage {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func weeklyQuotaCard(_ group: AntigravityQuotaGroup) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(group.name)
+                        .font(.callout.weight(.semibold))
+                    Text("WEEKLY LIMIT")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text("\(group.remainingPercent)% remaining")
+                    .font(.callout.monospacedDigit().weight(.semibold))
+            }
+            ProgressView(value: group.remainingFraction)
+                .tint(group.remainingPercent <= 15 ? .orange : .blue)
+            HStack(alignment: .top) {
+                Text("\(group.usedPercent)% used")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Text(group.modelNames.joined(separator: ", "))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(2)
+            }
+            if let resetTime = group.resetTime {
+                Text("Resets \(resetTime.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(11)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var usedPromptCredits: Double? {
+        guard let available = manager.snapshot?.availablePromptCredits,
+              let monthly = manager.snapshot?.monthlyPromptCredits else { return nil }
+        return max(monthly - available, 0)
+    }
+
+    private func creditText(_ value: Double?) -> String {
+        guard let value else { return "—" }
+        if value.rounded() == value { return String(format: "%.0f", value) }
+        return String(format: "%.2f", value)
     }
 }
 

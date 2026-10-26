@@ -19,6 +19,7 @@ struct OpenRouterCreditMenuBarApp: App {
                 .environmentObject(appDelegate.chatGPTManager)
                 .environmentObject(appDelegate.openAIAPIManager)
                 .environmentObject(appDelegate.openAIPlatformLoginManager)
+                .environmentObject(appDelegate.antigravityManager)
         }
     }
 }
@@ -31,6 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     @Published var chatGPTManager = ChatGPTManager()
     @Published var openAIAPIManager = OpenAIAPIManager()
     @Published var openAIPlatformLoginManager = OpenAIPlatformLoginManager()
+    @Published var antigravityManager = AntigravityManager()
 
     // Bộ theo dõi sự kiện chuột để tự đóng popover khi click ra ngoài
     private var localEventMonitor: Any?
@@ -70,6 +72,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 .environmentObject(chatGPTManager)
                 .environmentObject(openAIAPIManager)
                 .environmentObject(openAIPlatformLoginManager)
+                .environmentObject(antigravityManager)
         )
         popover?.behavior = .transient
         popover?.delegate = self
@@ -83,6 +86,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             await creditManager.fetchCredit()
             await openAIAPIManager.refresh()
         }
+        antigravityManager.startMonitoring()
 
     }
 
@@ -173,7 +177,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 : nil,
             openAIPlatformCredit: openAIPlatformLoginManager.isConnected
                 ? openAIPlatformLoginManager.availableCredit
-                : nil
+                : nil,
+            antigravityRemainingPercent: antigravityManager.snapshot?.lowestQuotaRemainingPercent
         )
 
         if let statusButton = statusItem?.button {
@@ -211,6 +216,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             chatGPTManager.$usedPercent.map { _ in () }.eraseToAnyPublisher(),
             openAIPlatformLoginManager.$isConnected.map { _ in () }.eraseToAnyPublisher(),
             openAIPlatformLoginManager.$availableCredit.map { _ in () }.eraseToAnyPublisher(),
+            antigravityManager.$snapshot.map { _ in () }.eraseToAnyPublisher(),
             NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
                 .map { _ in () }
                 .eraseToAnyPublisher()
@@ -263,7 +269,7 @@ struct MenuBarStatusGroup: Equatable {
             switch self {
             case .openRouter: "OpenRouter"
             case .openAI: "OpenAI"
-            case .googleAI: "Google AI"
+            case .googleAI: "Antigravity"
             }
         }
 
@@ -302,7 +308,7 @@ enum MenuBarStatusFormatter {
         openRouterCredit: Double?,
         chatGPTRemainingPercent: Int?,
         openAIPlatformCredit: Double?,
-        googleAICredit: Double? = nil
+        antigravityRemainingPercent: Int? = nil
     ) -> [MenuBarStatusGroup] {
         var groups: [MenuBarStatusGroup] = []
 
@@ -324,10 +330,10 @@ enum MenuBarStatusFormatter {
             groups.append(MenuBarStatusGroup(provider: .openAI, values: openAIValues))
         }
 
-        if let googleAICredit {
+        if let antigravityRemainingPercent {
             groups.append(MenuBarStatusGroup(
                 provider: .googleAI,
-                values: [formatCurrency(googleAICredit)]
+                values: ["\(antigravityRemainingPercent)%"]
             ))
         }
 

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		2168F44E30773F2D000A0BAC /* openrouter-icon-tran.png in Resources */ = {isa = PBXBuildFile; fileRef = 2168F44C30773F2D000A0BAC /* openrouter-icon-tran.png */; };
 		2168F44F30773F2D000A0BAC /* openrouter-icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 2168F44B30773F2D000A0BAC /* openrouter-icon.png */; };
+		AABBCCDDEEFF001122330016 /* AntigravityProcessService.xpc in Embed XPC Services */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122330002 /* AntigravityProcessService.xpc */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,6 +27,13 @@
 			remoteGlobalIDString = 3AB0A11D2DE1C32E000AA503;
 			remoteInfo = OpenRouterCreditMenuBar;
 		};
+		AABBCCDDEEFF00112233000D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3AB0A1162DE1C32E000AA503 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AABBCCDDEEFF001122330001;
+			remoteInfo = AntigravityProcessService;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +42,7 @@
 		3AB0A11E2DE1C32E000AA503 /* OpenRouterCreditMenuBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OpenRouterCreditMenuBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3AB0A12C2DE1C330000AA503 /* OpenRouterCreditMenuBarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenRouterCreditMenuBarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3AB0A1362DE1C330000AA503 /* OpenRouterCreditMenuBarUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OpenRouterCreditMenuBarUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AABBCCDDEEFF001122330002 /* AntigravityProcessService.xpc */ = {isa = PBXFileReference; explicitFileType = wrapper.xpc-service; includeInIndex = 0; path = AntigravityProcessService.xpc; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -43,6 +52,13 @@
 				Info.plist,
 			);
 			target = 3AB0A11D2DE1C32E000AA503 /* OpenRouterCreditMenuBar */;
+		};
+		AABBCCDDEEFF00112233000C /* Exceptions for "AntigravityProcessService" folder in "AntigravityProcessService" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AABBCCDDEEFF001122330001 /* AntigravityProcessService */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -70,6 +86,19 @@
 			path = OpenRouterCreditMenuBarUITests;
 			sourceTree = "<group>";
 		};
+		AABBCCDDEEFF00112233000A /* AntigravityShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AntigravityShared;
+			sourceTree = "<group>";
+		};
+		AABBCCDDEEFF00112233000B /* AntigravityProcessService */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AABBCCDDEEFF00112233000C /* Exceptions for "AntigravityProcessService" folder in "AntigravityProcessService" target */,
+			);
+			path = AntigravityProcessService;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -88,6 +117,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		3AB0A1332DE1C330000AA503 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AABBCCDDEEFF001122330010 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -114,6 +150,8 @@
 				3AB0A1202DE1C32E000AA503 /* OpenRouterCreditMenuBar */,
 				3AB0A12F2DE1C330000AA503 /* OpenRouterCreditMenuBarTests */,
 				3AB0A1392DE1C330000AA503 /* OpenRouterCreditMenuBarUITests */,
+				AABBCCDDEEFF00112233000A /* AntigravityShared */,
+				AABBCCDDEEFF00112233000B /* AntigravityProcessService */,
 				3AB0A11F2DE1C32E000AA503 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -124,6 +162,7 @@
 				3AB0A11E2DE1C32E000AA503 /* OpenRouterCreditMenuBar.app */,
 				3AB0A12C2DE1C330000AA503 /* OpenRouterCreditMenuBarTests.xctest */,
 				3AB0A1362DE1C330000AA503 /* OpenRouterCreditMenuBarUITests.xctest */,
+				AABBCCDDEEFF001122330002 /* AntigravityProcessService.xpc */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -138,14 +177,17 @@
 				3AB0A11A2DE1C32E000AA503 /* Sources */,
 				3AB0A11B2DE1C32E000AA503 /* Frameworks */,
 				3AB0A11C2DE1C32E000AA503 /* Resources */,
+				AABBCCDDEEFF001122330015 /* Embed XPC Services */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AABBCCDDEEFF001122330004 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				21B1007B306F4C5800FCB584 /* References */,
 				3AB0A1202DE1C32E000AA503 /* OpenRouterCreditMenuBar */,
+				AABBCCDDEEFF00112233000A /* AntigravityShared */,
 			);
 			name = OpenRouterCreditMenuBar;
 			packageProductDependencies = (
@@ -200,6 +242,29 @@
 			productReference = 3AB0A1362DE1C330000AA503 /* OpenRouterCreditMenuBarUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		AABBCCDDEEFF001122330001 /* AntigravityProcessService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AABBCCDDEEFF001122330007 /* Build configuration list for PBXNativeTarget "AntigravityProcessService" */;
+			buildPhases = (
+				AABBCCDDEEFF001122330011 /* Sources */,
+				AABBCCDDEEFF001122330010 /* Frameworks */,
+				AABBCCDDEEFF001122330012 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AABBCCDDEEFF00112233000A /* AntigravityShared */,
+				AABBCCDDEEFF00112233000B /* AntigravityProcessService */,
+			);
+			name = AntigravityProcessService;
+			packageProductDependencies = (
+			);
+			productName = AntigravityProcessService;
+			productReference = AABBCCDDEEFF001122330002 /* AntigravityProcessService.xpc */;
+			productType = "com.apple.product-type.xpc-service";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -221,6 +286,9 @@
 						CreatedOnToolsVersion = 16.3;
 						TestTargetID = 3AB0A11D2DE1C32E000AA503;
 					};
+					AABBCCDDEEFF001122330001 = {
+						CreatedOnToolsVersion = 16.3;
+					};
 				};
 			};
 			buildConfigurationList = 3AB0A1192DE1C32E000AA503 /* Build configuration list for PBXProject "OpenRouterCreditMenuBar" */;
@@ -240,6 +308,7 @@
 				3AB0A11D2DE1C32E000AA503 /* OpenRouterCreditMenuBar */,
 				3AB0A12B2DE1C330000AA503 /* OpenRouterCreditMenuBarTests */,
 				3AB0A1352DE1C330000AA503 /* OpenRouterCreditMenuBarUITests */,
+				AABBCCDDEEFF001122330001 /* AntigravityProcessService */,
 			);
 		};
 /* End PBXProject section */
@@ -262,6 +331,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		3AB0A1342DE1C330000AA503 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AABBCCDDEEFF001122330012 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -292,6 +368,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AABBCCDDEEFF001122330011 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -305,7 +388,26 @@
 			target = 3AB0A11D2DE1C32E000AA503 /* OpenRouterCreditMenuBar */;
 			targetProxy = 3AB0A1372DE1C330000AA503 /* PBXContainerItemProxy */;
 		};
+		AABBCCDDEEFF001122330004 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AABBCCDDEEFF001122330001 /* AntigravityProcessService */;
+			targetProxy = AABBCCDDEEFF00112233000D /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AABBCCDDEEFF001122330015 /* Embed XPC Services */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/XPCServices";
+			dstSubfolderSpec = 16;
+			files = (
+				AABBCCDDEEFF001122330016 /* AntigravityProcessService.xpc in Embed XPC Services */,
+			);
+			name = "Embed XPC Services";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
 		3AB0A13E2DE1C330000AA503 /* Debug */ = {
@@ -573,6 +675,40 @@
 			};
 			name = Release;
 		};
+		AABBCCDDEEFF001122330008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AntigravityProcessService/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 15.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kttizz.OpenRouterCreditMenuBar.AntigravityProcessService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AABBCCDDEEFF001122330009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AntigravityProcessService/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 15.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kttizz.OpenRouterCreditMenuBar.AntigravityProcessService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -608,6 +744,15 @@
 			buildConfigurations = (
 				3AB0A1472DE1C330000AA503 /* Debug */,
 				3AB0A1482DE1C330000AA503 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AABBCCDDEEFF001122330007 /* Build configuration list for PBXNativeTarget "AntigravityProcessService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AABBCCDDEEFF001122330008 /* Debug */,
+				AABBCCDDEEFF001122330009 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
