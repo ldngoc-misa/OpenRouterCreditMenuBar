@@ -8,7 +8,16 @@ import Foundation
 
 @MainActor
 final class AntigravityManager: ObservableObject {
+    private static let monitoringDefaultsKey = "google_ai_monitoring_enabled"
+
     @Published private(set) var snapshot: AntigravityQuotaSnapshot?
+    @Published private(set) var isConnected = false {
+        didSet {
+            guard oldValue != isConnected else { return }
+            setMonitoringEnabled(isConnected)
+        }
+    }
+    @Published private(set) var isMonitoringEnabled = UserDefaults.standard.bool(forKey: "google_ai_monitoring_enabled")
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastUpdated: Date?
@@ -29,6 +38,15 @@ final class AntigravityManager: ObservableObject {
         setupRefreshTimer()
     }
 
+    func setMonitoringEnabled(_ enabled: Bool) {
+        let shouldEnable = isConnected && enabled
+        if isMonitoringEnabled != shouldEnable {
+            isMonitoringEnabled = shouldEnable
+            UserDefaults.standard.set(shouldEnable, forKey: Self.monitoringDefaultsKey)
+        }
+        setupRefreshTimer()
+    }
+
     func refresh() async {
         guard !isLoading else { return }
         isLoading = true
@@ -36,10 +54,13 @@ final class AntigravityManager: ObservableObject {
 
         do {
             snapshot = try await AntigravityQuotaXPCClient.fetchQuota()
+            isConnected = true
             lastUpdated = Date()
         } catch let error as AntigravityQuotaClientError {
+            isConnected = false
             errorMessage = error.localizedDescription
         } catch {
+            isConnected = false
             errorMessage = AntigravityQuotaClientError.connectionFailed((error as NSError).code).localizedDescription
         }
 
@@ -48,6 +69,7 @@ final class AntigravityManager: ObservableObject {
 
     private func setupRefreshTimer() {
         refreshTimer?.invalidate()
+        guard isConnected && isMonitoringEnabled else { return }
         refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 await self?.refresh()

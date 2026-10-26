@@ -17,7 +17,15 @@ struct ChatGPTMetric: Identifiable {
 
 @MainActor
 final class ChatGPTManager: NSObject, ObservableObject {
-    @Published private(set) var isConnected = false
+    private static let monitoringDefaultsKey = "chatgpt_monitoring_enabled"
+
+    @Published private(set) var isConnected = false {
+        didSet {
+            guard oldValue != isConnected else { return }
+            setMonitoringEnabled(isConnected)
+        }
+    }
+    @Published private(set) var isMonitoringEnabled = UserDefaults.standard.bool(forKey: "chatgpt_monitoring_enabled")
     @Published private(set) var isLoading = false
     @Published private(set) var accountEmail: String?
     @Published private(set) var planType: String?
@@ -50,6 +58,15 @@ final class ChatGPTManager: NSObject, ObservableObject {
 
     func setRefreshInterval(_ interval: TimeInterval) {
         refreshInterval = interval
+        setupRefreshTimer()
+    }
+
+    func setMonitoringEnabled(_ enabled: Bool) {
+        let shouldEnable = isConnected && enabled
+        if isMonitoringEnabled != shouldEnable {
+            isMonitoringEnabled = shouldEnable
+            UserDefaults.standard.set(shouldEnable, forKey: Self.monitoringDefaultsKey)
+        }
         setupRefreshTimer()
     }
 
@@ -166,7 +183,7 @@ final class ChatGPTManager: NSObject, ObservableObject {
 
     private func setupRefreshTimer() {
         refreshTimer?.invalidate()
-        guard isConnected else { return }
+        guard isConnected && isMonitoringEnabled else { return }
         refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }

@@ -1121,7 +1121,6 @@ private struct ChatGPTProviderView: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .topLeading)
-            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
 
             if let error = manager.errorMessage, manager.isConnected {
                 Label(error, systemImage: "exclamationmark.triangle")
@@ -1141,6 +1140,34 @@ private struct OpenAIProviderView: View {
         apiManager.isConnected || platformManager.isConnected
     }
 
+    private var todaySpend: Double? {
+        OpenAISpendResolver.preferredSpend(
+            webLoginCost: platformManager.todayCost,
+            adminAPIKeyCost: apiManager.todayCost
+        )
+    }
+
+    private var todaySpendBreakdown: [OpenAIAPICostBreakdown] {
+        platformManager.todayCost != nil ? platformManager.costsByLineItem : apiManager.costsByLineItem
+    }
+
+    private var todaySpendDetails: [(String, String)] {
+        let breakdown = todaySpendBreakdown.sorted { $0.todayAmount > $1.todayAmount }
+        if !breakdown.isEmpty {
+            return breakdown.prefix(8).map { item in
+                (
+                    [item.lineItem, item.projectID].compactMap { $0 }.joined(separator: " · "),
+                    Self.formatCurrency(item.todayAmount)
+                )
+            }
+        }
+        if todaySpend == nil,
+           let error = platformManager.costsErrorMessage ?? apiManager.costsErrorMessage {
+            return [(error, "Unavailable")]
+        }
+        return []
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
@@ -1154,7 +1181,7 @@ private struct OpenAIProviderView: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
-                    Text("Platform API usage and credit")
+                    Text("Organization usage and credit")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -1165,38 +1192,12 @@ private struct OpenAIProviderView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Label("API", systemImage: "terminal")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    if let lastUpdated = apiManager.lastUpdated {
-                        Text("Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                    Label(
-                        apiManager.isConnected ? "Connected" : "Not connected",
-                        systemImage: apiManager.isConnected ? "checkmark.circle.fill" : "circle.dashed"
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(apiManager.isConnected ? .green : .secondary)
-                }
-
                 HStack(alignment: .top, spacing: 8) {
                     OpenAIMetricBlock(title: "COST", metrics: [
                         OpenAIMetricValue(
                             label: "Spend Today",
-                            value: apiManager.todayCost.map(Self.formatCurrency) ?? "--",
-                            details: apiManager.costsByLineItem
-                                .sorted { $0.todayAmount > $1.todayAmount }
-                                .prefix(8)
-                                .map { item in
-                                    (
-                                        [item.lineItem, item.projectID].compactMap { $0 }.joined(separator: " · "),
-                                        Self.formatCurrency(item.todayAmount)
-                                    )
-                                }
+                            value: todaySpend.map(Self.formatCurrency) ?? "--",
+                            details: todaySpendDetails
                         ),
                         OpenAIMetricValue(
                             label: "Available",
@@ -1271,8 +1272,8 @@ private struct OpenAIProviderView: View {
                     Text(apiManager.isLoading
                         ? "Loading API usage…"
                         : (apiManager.usageErrorMessage != nil || apiManager.costsErrorMessage != nil
-                            ? "Check the Admin API key and organization permissions in Settings."
-                            : "Add an Organization Admin API key in Settings to connect."))
+                            ? "Check the Admin API key and organization permissions to load Tokens and Requests."
+                            : "Add an Organization Admin API key in Settings to load Tokens and Requests."))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -1280,7 +1281,6 @@ private struct OpenAIProviderView: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .topLeading)
-            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
         }
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .padding(.vertical, 8)
@@ -1404,11 +1404,11 @@ private struct GoogleAIProviderView: View {
                 }
                 Spacer()
                 Label(
-                    manager.snapshot == nil ? "Not detected" : "Connected",
-                    systemImage: manager.snapshot == nil ? "circle.dashed" : "checkmark.circle.fill"
+                    manager.isConnected ? "Connected" : "Not detected",
+                    systemImage: manager.isConnected ? "checkmark.circle.fill" : "circle.dashed"
                 )
                     .font(.caption)
-                    .foregroundStyle(manager.snapshot == nil ? Color.secondary : Color.green)
+                    .foregroundStyle(manager.isConnected ? Color.green : Color.secondary)
             }
 
             HStack(spacing: 12) {

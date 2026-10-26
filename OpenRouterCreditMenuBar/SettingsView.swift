@@ -15,7 +15,6 @@ struct SettingsView: View {
     @EnvironmentObject var antigravityManager: AntigravityManager
     @State private var apiKey: String = ""
     @State private var openAIAdminAPIKey: String = ""
-    @State private var isEnabled: Bool = true
     @State private var openAtLogin: Bool = false
     @State private var refreshInterval: Double = 300  // default 5 minutes
     @State private var isShowingChatGPTLogin = false
@@ -26,16 +25,6 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("General") {
-                Toggle("Enable Credit Monitoring", isOn: $isEnabled)
-                    .onChange(of: isEnabled) { _, newValue in
-                        creditManager.isEnabled = newValue
-                        if newValue {
-                            Task {
-                                await creditManager.fetchCredit()
-                            }
-                        }
-                    }
-
                 Toggle("Open at Login", isOn: $openAtLogin)
                     .onChange(of: openAtLogin) { _, newValue in
                         setLoginItemEnabled(newValue)
@@ -55,6 +44,7 @@ struct SettingsView: View {
                     creditManager.refreshInterval = newValue
                     chatGPTManager.setRefreshInterval(newValue)
                     openAIAPIManager.setRefreshInterval(newValue)
+                    openAIPlatformLoginManager.setRefreshInterval(newValue)
                     antigravityManager.setRefreshInterval(newValue)
                 }
             }
@@ -89,7 +79,12 @@ struct SettingsView: View {
                 providerSectionHeader(
                     "OpenRouter",
                     icon: .symbol(ProviderIconName.openRouter),
-                    color: ProviderIconColor.swiftUIColor(hex: ProviderIconColor.openRouter)
+                    color: ProviderIconColor.swiftUIColor(hex: ProviderIconColor.openRouter),
+                    isConnected: creditManager.isConnected,
+                    isMonitoringEnabled: Binding(
+                        get: { creditManager.isConnected && creditManager.isMonitoringEnabled },
+                        set: { creditManager.setMonitoringEnabled($0) }
+                    )
                 )
             }
 
@@ -132,7 +127,12 @@ struct SettingsView: View {
                 providerSectionHeader(
                     "ChatGPT",
                     icon: .symbol(ProviderIconName.chatGPT),
-                    color: ProviderIconColor.swiftUIColor(hex: ProviderIconColor.chatGPT)
+                    color: ProviderIconColor.swiftUIColor(hex: ProviderIconColor.chatGPT),
+                    isConnected: chatGPTManager.isConnected,
+                    isMonitoringEnabled: Binding(
+                        get: { chatGPTManager.isConnected && chatGPTManager.isMonitoringEnabled },
+                        set: { chatGPTManager.setMonitoringEnabled($0) }
+                    )
                 )
             }
 
@@ -231,7 +231,20 @@ struct SettingsView: View {
                 providerSectionHeader(
                     "OpenAI",
                     icon: .symbol(ProviderIconName.openAI),
-                    color: ProviderIconColor.swiftUIColor(hex: ProviderIconColor.openAI)
+                    color: ProviderIconColor.swiftUIColor(hex: ProviderIconColor.openAI),
+                    isConnected: openAIAPIManager.isConnected || openAIPlatformLoginManager.isConnected,
+                    isMonitoringEnabled: Binding(
+                        get: {
+                            let isConnected = openAIAPIManager.isConnected || openAIPlatformLoginManager.isConnected
+                            let isMonitoringEnabled = openAIAPIManager.isMonitoringEnabled
+                                || openAIPlatformLoginManager.isMonitoringEnabled
+                            return isConnected && isMonitoringEnabled
+                        },
+                        set: { enabled in
+                            openAIAPIManager.setMonitoringEnabled(enabled)
+                            openAIPlatformLoginManager.setMonitoringEnabled(enabled)
+                        }
+                    )
                 )
             }
 
@@ -241,7 +254,7 @@ struct SettingsView: View {
                     "Status",
                     value: antigravityManager.isLoading
                         ? "Checking…"
-                        : antigravityManager.snapshot == nil ? "Not detected" : "Connected"
+                        : antigravityManager.isConnected ? "Connected" : "Not detected"
                 )
                 if let lastUpdated = antigravityManager.lastUpdated {
                     LabeledContent("Last updated", value: lastUpdated.formatted(date: .abbreviated, time: .shortened))
@@ -264,7 +277,12 @@ struct SettingsView: View {
                 providerSectionHeader(
                     "Google AI",
                     icon: .asset(ProviderIconName.googleAI),
-                    color: ProviderIconColor.swiftUIColor(hex: ProviderIconColor.googleAI)
+                    color: ProviderIconColor.swiftUIColor(hex: ProviderIconColor.googleAI),
+                    isConnected: antigravityManager.isConnected,
+                    isMonitoringEnabled: Binding(
+                        get: { antigravityManager.isConnected && antigravityManager.isMonitoringEnabled },
+                        set: { antigravityManager.setMonitoringEnabled($0) }
+                    )
                 )
             }
 
@@ -293,18 +311,28 @@ struct SettingsView: View {
     private func loadSettings() {
         apiKey = creditManager.apiKey
         openAIAdminAPIKey = openAIAPIManager.adminAPIKey
-        isEnabled = creditManager.isEnabled
         refreshInterval = creditManager.refreshInterval
         openAtLogin = SMAppService.mainApp.status == .enabled
         openAIAPIManager.setRefreshInterval(refreshInterval)
+        openAIPlatformLoginManager.setRefreshInterval(refreshInterval)
         antigravityManager.setRefreshInterval(refreshInterval)
     }
 
-    private func providerSectionHeader(_ title: String, icon: ProviderIcon, color: Color) -> some View {
+    private func providerSectionHeader(
+        _ title: String,
+        icon: ProviderIcon,
+        color: Color,
+        isConnected: Bool,
+        isMonitoringEnabled: Binding<Bool>
+    ) -> some View {
         HStack(spacing: 6) {
             icon.swiftUIImage(size: 16)
                 .foregroundStyle(color)
             Text(title)
+            Spacer(minLength: 8)
+            Toggle("Enable \(title) credit monitoring", isOn: isMonitoringEnabled)
+                .labelsHidden()
+                .disabled(!isConnected)
         }
     }
 

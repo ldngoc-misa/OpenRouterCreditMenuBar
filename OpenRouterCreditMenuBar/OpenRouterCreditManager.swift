@@ -423,6 +423,13 @@ extension Color {
 
 class OpenRouterCreditManager: ObservableObject {
     @Published var currentCredit: Double?
+    @Published private(set) var isConnected = false {
+        didSet {
+            guard oldValue != isConnected else { return }
+            setMonitoringEnabled(isConnected)
+        }
+    }
+    @Published private(set) var isMonitoringEnabled = false
     @Published var totalUsage: Double?
     @Published var spentToday: Double?
     /// The UTC day that `spentToday` refers to (start of the current UTC day).
@@ -479,6 +486,7 @@ class OpenRouterCreditManager: ObservableObject {
     }
 
     private let userDefaults = UserDefaults.standard
+    private static let monitoringDefaultsKey = "openrouter_monitoring_enabled"
     private var refreshTimer: Timer?
 
     var apiKey: String {
@@ -486,17 +494,23 @@ class OpenRouterCreditManager: ObservableObject {
             userDefaults.string(forKey: "openrouter_api_key") ?? ""
         }
         set {
+            guard newValue != apiKey else { return }
             userDefaults.set(newValue, forKey: "openrouter_api_key")
+            isConnected = false
+            currentCredit = nil
+            creditErrorMessage = nil
+            errorMessage = nil
+            setupTimer()
         }
     }
 
-    var isEnabled: Bool {
-        get {
-            userDefaults.bool(forKey: "app_enabled")
+    func setMonitoringEnabled(_ enabled: Bool) {
+        let shouldEnable = isConnected && enabled
+        if isMonitoringEnabled != shouldEnable {
+            isMonitoringEnabled = shouldEnable
+            userDefaults.set(shouldEnable, forKey: Self.monitoringDefaultsKey)
         }
-        set {
-            userDefaults.set(newValue, forKey: "app_enabled")
-        }
+        setupTimer()
     }
 
     var refreshInterval: Double {
@@ -513,6 +527,13 @@ class OpenRouterCreditManager: ObservableObject {
     private var filterCancellables = Set<AnyCancellable>()
 
     init() {
+        if let savedValue = userDefaults.object(forKey: Self.monitoringDefaultsKey) as? Bool {
+            isMonitoringEnabled = savedValue
+        } else {
+            isMonitoringEnabled = userDefaults.bool(forKey: "app_enabled")
+            userDefaults.set(isMonitoringEnabled, forKey: Self.monitoringDefaultsKey)
+            userDefaults.removeObject(forKey: "app_enabled")
+        }
         setupTimer()
         setupFilterObservers()
     }
@@ -535,7 +556,7 @@ class OpenRouterCreditManager: ObservableObject {
     private func setupTimer() {
         refreshTimer?.invalidate()
 
-        guard isEnabled && !apiKey.isEmpty else { return }
+        guard isMonitoringEnabled && isConnected && !apiKey.isEmpty else { return }
 
         refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { _ in
             Task {
@@ -570,7 +591,7 @@ class OpenRouterCreditManager: ObservableObject {
     }
 
     func fetchCredit() async {
-        guard !apiKey.isEmpty && isEnabled else { return }
+        guard !apiKey.isEmpty else { return }
 
         await MainActor.run {
             isLoading = true
@@ -588,6 +609,7 @@ class OpenRouterCreditManager: ObservableObject {
             let spentToday = try await fetchSpentTodayFromAPI()
             let spentTodayByModel = try await fetchSpentTodayByModelFromAPI()
             await MainActor.run {
+                self.isConnected = true
                 self.currentCredit = creditData.total_credits - creditData.total_usage
                 self.totalUsage = creditData.total_usage
                 self.spentToday = spentToday.amount
@@ -596,6 +618,7 @@ class OpenRouterCreditManager: ObservableObject {
             }
         } catch {
             await MainActor.run {
+                self.isConnected = false
                 self.creditErrorMessage = error.localizedDescription
                 self.errorMessage = error.localizedDescription // Legacy compatibility
             }

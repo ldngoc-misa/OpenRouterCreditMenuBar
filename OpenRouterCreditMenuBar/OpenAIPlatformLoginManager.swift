@@ -31,17 +31,118 @@ struct OpenAIPlatformOrganization: Decodable, Identifiable {
     }
 }
 
+struct OpenAIPlatformCostPage: Decodable {
+    let data: [OpenAIPlatformCostBucket]
+    let nextPage: String?
+
+    enum CodingKeys: String, CodingKey {
+        case data
+        case nextPage = "next_page"
+    }
+}
+
+struct OpenAIPlatformCostBucket: Decodable {
+    let startTime: TimeInterval
+    let results: [OpenAIPlatformCostResult]
+
+    enum CodingKeys: String, CodingKey {
+        case startTime = "start_time"
+        case results
+    }
+}
+
+struct OpenAIPlatformCostResult: Decodable {
+    let amount: OpenAIPlatformCostAmount
+    let lineItem: String?
+    let projectID: String?
+
+    enum CodingKeys: String, CodingKey {
+        case amount
+        case lineItem = "line_item"
+        case projectID = "project_id"
+    }
+}
+
+struct OpenAIPlatformCostAmount: Decodable {
+    let value: Double
+}
+
+struct OpenAIPlatformCostSummary {
+    let total: Double
+    let breakdown: [OpenAIAPICostBreakdown]
+}
+
+enum OpenAIPlatformCostCalculator {
+    static func utcDayRange(for date: Date) -> DateInterval {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let start = calendar.startOfDay(for: date)
+        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
+        return DateInterval(start: start, end: end)
+    }
+
+    static func summarize(
+        buckets: [OpenAIPlatformCostBucket],
+        during day: DateInterval
+    ) -> OpenAIPlatformCostSummary {
+        var breakdownByKey: [String: OpenAIAPICostBreakdown] = [:]
+        let startTime = day.start.timeIntervalSince1970
+        let endTime = day.end.timeIntervalSince1970
+
+        for bucket in buckets where bucket.startTime >= startTime && bucket.startTime < endTime {
+            for result in bucket.results where result.amount.value.isFinite {
+                let lineItem = result.lineItem ?? "Organization spend"
+                let key = "\(result.projectID ?? "")|\(lineItem)"
+                var entry = breakdownByKey[key] ?? OpenAIAPICostBreakdown(
+                    projectID: result.projectID,
+                    lineItem: lineItem,
+                    amount: 0,
+                    todayAmount: 0
+                )
+                entry.amount += result.amount.value
+                entry.todayAmount += result.amount.value
+                breakdownByKey[key] = entry
+            }
+        }
+
+        let breakdown = breakdownByKey.values.sorted {
+            if $0.todayAmount == $1.todayAmount { return $0.id < $1.id }
+            return $0.todayAmount > $1.todayAmount
+        }
+        return OpenAIPlatformCostSummary(
+            total: breakdown.reduce(0) { $0 + $1.todayAmount },
+            breakdown: breakdown
+        )
+    }
+}
+
+enum OpenAISpendResolver {
+    static func preferredSpend(webLoginCost: Double?, adminAPIKeyCost: Double?) -> Double? {
+        webLoginCost ?? adminAPIKeyCost
+    }
+}
+
 @MainActor
 final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
     private static let websiteDataStoreIdentifierKey = "openAIPlatformWebsiteDataStoreIdentifier"
     private static let selectedOrganizationDefaultsKey = "openAIPlatformSelectedOrganizationID"
+    private static let monitoringDefaultsKey = "openai_platform_monitoring_enabled"
 
-    @Published private(set) var isConnected = false
+    @Published private(set) var isConnected = false {
+        didSet {
+            guard oldValue != isConnected else { return }
+            setMonitoringEnabled(isConnected)
+        }
+    }
+    @Published private(set) var isMonitoringEnabled = UserDefaults.standard.bool(forKey: "openai_platform_monitoring_enabled")
     @Published private(set) var isLoading = false
     @Published private(set) var accountEmail: String?
     @Published private(set) var errorMessage: String?
     @Published private(set) var availableCredit: Double?
     @Published private(set) var creditGrantsErrorMessage: String?
+    @Published private(set) var todayCost: Double?
+    @Published private(set) var costsByLineItem: [OpenAIAPICostBreakdown] = []
+    @Published private(set) var costsErrorMessage: String?
     @Published private(set) var organizations: [OpenAIPlatformOrganization] = []
     @Published private(set) var selectedOrganizationID: String?
 
@@ -52,6 +153,13 @@ final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
     private var platformSessionToken: String?
     private var isRefreshingCreditGrants = false
     private var hasPendingCreditRefresh = false
+    private var isRefreshingOrganizationCosts = false
+    private var hasPendingOrganizationCostsRefresh = false
+    private var refreshTimer: Timer?
+    private var refreshInterval: TimeInterval = {
+        let interval = UserDefaults.standard.double(forKey: "refresh_interval")
+        return interval > 0 ? interval : 300
+    }()
 
     override init() {
         let configuration = WKWebViewConfiguration()
@@ -101,6 +209,20 @@ final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
         refreshCreditGrants()
     }
 
+    func setRefreshInterval(_ interval: TimeInterval) {
+        refreshInterval = interval
+        setupRefreshTimer()
+    }
+
+    func setMonitoringEnabled(_ enabled: Bool) {
+        let shouldEnable = isConnected && enabled
+        if isMonitoringEnabled != shouldEnable {
+            isMonitoringEnabled = shouldEnable
+            UserDefaults.standard.set(shouldEnable, forKey: Self.monitoringDefaultsKey)
+        }
+        setupRefreshTimer()
+    }
+
     func disconnect() {
         isLoginFlowActive = false
         didVisitAuthenticationPage = false
@@ -108,8 +230,13 @@ final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
         accountEmail = nil
         availableCredit = nil
         creditGrantsErrorMessage = nil
+        todayCost = nil
+        costsByLineItem = []
+        costsErrorMessage = nil
         organizations = []
         platformSessionToken = nil
+        hasPendingCreditRefresh = false
+        hasPendingOrganizationCostsRefresh = false
         isLoading = true
         errorMessage = nil
 
@@ -131,11 +258,23 @@ final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
               selectedOrganizationID != organizationID else { return }
         selectedOrganizationID = organizationID
         UserDefaults.standard.set(organizationID, forKey: Self.selectedOrganizationDefaultsKey)
+        availableCredit = nil
+        creditGrantsErrorMessage = nil
+        todayCost = nil
+        costsByLineItem = []
+        costsErrorMessage = nil
         refreshCreditGrants()
     }
 
     func refreshCreditGrants() {
         guard browserView.url?.host == "platform.openai.com" else { return }
+        if let token = platformSessionToken, let organizationID = selectedOrganizationID {
+            refreshOrganizationCosts(
+                sessionToken: token,
+                organizationID: organizationID,
+                retryAfterUnauthorized: true
+            )
+        }
         guard !isRefreshingCreditGrants else {
             hasPendingCreditRefresh = true
             return
@@ -145,6 +284,10 @@ final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
         if let platformSessionToken {
             guard let organizationID = selectedOrganizationID else {
                 creditGrantsErrorMessage = "Choose an OpenAI organization in Settings."
+                costsErrorMessage = "Choose an OpenAI organization in Settings."
+                availableCredit = nil
+                todayCost = nil
+                costsByLineItem = []
                 finishCreditGrantsRefresh()
                 return
             }
@@ -232,6 +375,9 @@ final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
                     guard (200..<300).contains(login.status) else {
                         self.availableCredit = nil
                         self.creditGrantsErrorMessage = "OpenAI login request failed (HTTP \(login.status))."
+                        self.todayCost = nil
+                        self.costsByLineItem = []
+                        self.costsErrorMessage = "OpenAI Platform login request failed (HTTP \(login.status))."
                         self.finishCreditGrantsRefresh()
                         return
                     }
@@ -239,10 +385,16 @@ final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
                           let organizationID = self.selectedOrganizationID else {
                         self.availableCredit = nil
                         self.creditGrantsErrorMessage = "Choose an OpenAI organization in Settings."
+                        self.costsErrorMessage = "Choose an OpenAI organization in Settings."
                         self.finishCreditGrantsRefresh()
                         return
                     }
                     self.hasPendingCreditRefresh = false
+                    self.refreshOrganizationCosts(
+                        sessionToken: token,
+                        organizationID: organizationID,
+                        retryAfterUnauthorized: false
+                    )
                     Task {
                         await self.requestCreditGrants(
                             sessionToken: token,
@@ -254,6 +406,11 @@ final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
                     if let token = self.platformSessionToken,
                        let organizationID = self.selectedOrganizationID {
                         self.hasPendingCreditRefresh = false
+                        self.refreshOrganizationCosts(
+                            sessionToken: token,
+                            organizationID: organizationID,
+                            retryAfterUnauthorized: true
+                        )
                         Task {
                             await self.requestCreditGrants(
                                 sessionToken: token,
@@ -265,10 +422,16 @@ final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
                     }
                     self.availableCredit = nil
                     self.creditGrantsErrorMessage = "OpenAI login response failed: \(error.localizedDescription)"
+                    self.todayCost = nil
+                    self.costsByLineItem = []
+                    self.costsErrorMessage = "OpenAI login response failed: \(error.localizedDescription)"
                     self.finishCreditGrantsRefresh()
                 default:
                     self.availableCredit = nil
                     self.creditGrantsErrorMessage = "Could not read OpenAI credit balance."
+                    self.todayCost = nil
+                    self.costsByLineItem = []
+                    self.costsErrorMessage = "Could not read OpenAI login data."
                     self.finishCreditGrantsRefresh()
                 }
             }
@@ -296,6 +459,11 @@ final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
+            guard platformSessionToken == sessionToken,
+                  selectedOrganizationID == organizationID else {
+                finishCreditGrantsRefresh()
+                return
+            }
             guard let httpResponse = response as? HTTPURLResponse else {
                 creditGrantsErrorMessage = "OpenAI returned an invalid credit response."
                 finishCreditGrantsRefresh()
@@ -320,10 +488,163 @@ final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
             creditGrantsErrorMessage = nil
             finishCreditGrantsRefresh()
         } catch {
+            guard platformSessionToken == sessionToken,
+                  selectedOrganizationID == organizationID else {
+                finishCreditGrantsRefresh()
+                return
+            }
             availableCredit = nil
             creditGrantsErrorMessage = error.localizedDescription
             finishCreditGrantsRefresh()
         }
+    }
+
+    private func refreshOrganizationCosts(
+        sessionToken: String,
+        organizationID: String,
+        retryAfterUnauthorized: Bool
+    ) {
+        guard browserView.url?.host == "platform.openai.com",
+              platformSessionToken == sessionToken,
+              selectedOrganizationID == organizationID else { return }
+        guard !isRefreshingOrganizationCosts else {
+            hasPendingOrganizationCostsRefresh = true
+            return
+        }
+
+        isRefreshingOrganizationCosts = true
+        costsErrorMessage = nil
+        Task {
+            await requestOrganizationCosts(
+                sessionToken: sessionToken,
+                organizationID: organizationID,
+                retryAfterUnauthorized: retryAfterUnauthorized
+            )
+        }
+    }
+
+    private func requestOrganizationCosts(
+        sessionToken: String,
+        organizationID: String,
+        retryAfterUnauthorized: Bool
+    ) async {
+        let day = OpenAIPlatformCostCalculator.utcDayRange(for: Date())
+
+        do {
+            let buckets = try await fetchOrganizationCostBuckets(
+                sessionToken: sessionToken,
+                organizationID: organizationID,
+                during: day
+            )
+            guard platformSessionToken == sessionToken,
+                  selectedOrganizationID == organizationID else {
+                finishOrganizationCostsRefresh()
+                return
+            }
+
+            let summary = OpenAIPlatformCostCalculator.summarize(buckets: buckets, during: day)
+            todayCost = summary.total
+            costsByLineItem = summary.breakdown
+            costsErrorMessage = nil
+            finishOrganizationCostsRefresh()
+        } catch OpenAIPlatformCostRequestError.unauthorized where retryAfterUnauthorized {
+            guard platformSessionToken == sessionToken else {
+                finishOrganizationCostsRefresh()
+                return
+            }
+            platformSessionToken = nil
+            todayCost = nil
+            costsByLineItem = []
+            costsErrorMessage = nil
+            finishOrganizationCostsRefresh()
+            refreshCreditGrants()
+        } catch {
+            guard platformSessionToken == sessionToken,
+                  selectedOrganizationID == organizationID else {
+                finishOrganizationCostsRefresh()
+                return
+            }
+            todayCost = nil
+            costsByLineItem = []
+            costsErrorMessage = error.localizedDescription
+            finishOrganizationCostsRefresh()
+        }
+    }
+
+    private func fetchOrganizationCostBuckets(
+        sessionToken: String,
+        organizationID: String,
+        during day: DateInterval
+    ) async throws -> [OpenAIPlatformCostBucket] {
+        var page: String?
+        var buckets: [OpenAIPlatformCostBucket] = []
+        var seenPages = Set<String>()
+
+        repeat {
+            guard var components = URLComponents(
+                string: "https://api.openai.com/v1/dashboard/organization/costs"
+            ) else {
+                throw OpenAIPlatformCostRequestError.invalidURL
+            }
+            components.queryItems = [
+                URLQueryItem(name: "start_time", value: String(Int(day.start.timeIntervalSince1970))),
+                URLQueryItem(name: "end_time", value: String(Int(day.end.timeIntervalSince1970))),
+                URLQueryItem(name: "bucket_width", value: "1d"),
+                URLQueryItem(name: "limit", value: "31")
+            ]
+            if let page {
+                components.queryItems?.append(URLQueryItem(name: "page", value: page))
+            }
+            guard let url = components.url else { throw OpenAIPlatformCostRequestError.invalidURL }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.setValue("Bearer \(sessionToken)", forHTTPHeaderField: "Authorization")
+            request.setValue(organizationID, forHTTPHeaderField: "openai-organization")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.setValue("https://platform.openai.com", forHTTPHeaderField: "Origin")
+            request.setValue("https://platform.openai.com/", forHTTPHeaderField: "Referer")
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw OpenAIPlatformCostRequestError.invalidResponse
+            }
+            if httpResponse.statusCode == 401 {
+                throw OpenAIPlatformCostRequestError.unauthorized
+            }
+            guard (200..<300).contains(httpResponse.statusCode) else {
+                throw OpenAIPlatformCostRequestError.httpStatus(
+                    httpResponse.statusCode,
+                    Self.errorMessage(from: data)
+                )
+            }
+
+            let pageResponse = try JSONDecoder().decode(OpenAIPlatformCostPage.self, from: data)
+            buckets.append(contentsOf: pageResponse.data)
+            guard let nextPage = pageResponse.nextPage, !nextPage.isEmpty else {
+                page = nil
+                continue
+            }
+            guard seenPages.insert(nextPage).inserted else {
+                throw OpenAIPlatformCostRequestError.paginationLoop
+            }
+            page = nextPage
+        } while page != nil
+
+        return buckets
+    }
+
+    private func finishOrganizationCostsRefresh() {
+        isRefreshingOrganizationCosts = false
+        guard hasPendingOrganizationCostsRefresh else { return }
+        hasPendingOrganizationCostsRefresh = false
+        guard let token = platformSessionToken,
+              let organizationID = selectedOrganizationID else { return }
+        refreshOrganizationCosts(
+            sessionToken: token,
+            organizationID: organizationID,
+            retryAfterUnauthorized: true
+        )
     }
 
     private func finishCreditGrantsRefresh() {
@@ -347,8 +668,24 @@ final class OpenAIPlatformLoginManager: NSObject, ObservableObject {
             return
         }
         let selected = organizations.first(where: \.isDefault) ?? organizations[0]
+        let organizationChanged = selectedOrganizationID != selected.id
         selectedOrganizationID = selected.id
         UserDefaults.standard.set(selected.id, forKey: Self.selectedOrganizationDefaultsKey)
+        if organizationChanged {
+            availableCredit = nil
+            creditGrantsErrorMessage = nil
+            todayCost = nil
+            costsByLineItem = []
+            costsErrorMessage = nil
+        }
+    }
+
+    private func setupRefreshTimer() {
+        refreshTimer?.invalidate()
+        guard isConnected && isMonitoringEnabled else { return }
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refreshAccount() }
+        }
     }
 
     private static func makeWebsiteDataStore() -> WKWebsiteDataStore {
@@ -533,6 +870,29 @@ private struct CreditGrantsWebResponse: Decodable {
         case accountEmail
         case sessionToken
         case organizations
+    }
+}
+
+private enum OpenAIPlatformCostRequestError: LocalizedError {
+    case invalidURL
+    case invalidResponse
+    case paginationLoop
+    case unauthorized
+    case httpStatus(Int, String?)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            "Could not create the OpenAI organization costs request."
+        case .invalidResponse:
+            "OpenAI returned an invalid organization costs response."
+        case .paginationLoop:
+            "OpenAI returned a repeated organization costs page."
+        case .unauthorized:
+            "OpenAI Platform session expired. Sign in again."
+        case .httpStatus(let status, let message):
+            message ?? "OpenAI organization costs request failed (HTTP \(status))."
+        }
     }
 }
 

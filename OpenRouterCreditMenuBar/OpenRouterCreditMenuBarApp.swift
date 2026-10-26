@@ -167,18 +167,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     func updateMenuBarTitle() {
         let groups = MenuBarStatusFormatter.makeGroups(
-            openRouterCredit: creditManager.isEnabled
+            openRouterCredit: creditManager.isMonitoringEnabled && creditManager.isConnected
                 && !creditManager.apiKey.isEmpty
                 && creditManager.creditErrorMessage == nil
                 ? creditManager.currentCredit
                 : nil,
-            chatGPTRemainingPercent: chatGPTManager.isConnected
+            chatGPTRemainingPercent: chatGPTManager.isMonitoringEnabled && chatGPTManager.isConnected
                 ? chatGPTManager.usedPercent.map(MenuBarStatusFormatter.remainingPercent(fromUsedPercent:))
                 : nil,
-            openAIPlatformCredit: openAIPlatformLoginManager.isConnected
+            openAIPlatformCredit: openAIPlatformLoginManager.isMonitoringEnabled && openAIPlatformLoginManager.isConnected
                 ? openAIPlatformLoginManager.availableCredit
                 : nil,
-            antigravityRemainingPercent: antigravityManager.snapshot?.lowestQuotaRemainingPercent
+            antigravityRemainingPercent: antigravityManager.isMonitoringEnabled && antigravityManager.isConnected
+                ? antigravityManager.snapshot?.lowestQuotaRemainingPercent
+                : nil
         )
 
         if let statusButton = statusItem?.button {
@@ -211,12 +213,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func observeMenuBarData() {
         let changes: [AnyPublisher<Void, Never>] = [
             creditManager.$currentCredit.map { _ in () }.eraseToAnyPublisher(),
+            creditManager.$isConnected.map { _ in () }.eraseToAnyPublisher(),
+            creditManager.$isMonitoringEnabled.map { _ in () }.eraseToAnyPublisher(),
             creditManager.$creditErrorMessage.map { _ in () }.eraseToAnyPublisher(),
             chatGPTManager.$isConnected.map { _ in () }.eraseToAnyPublisher(),
+            chatGPTManager.$isMonitoringEnabled.map { _ in () }.eraseToAnyPublisher(),
             chatGPTManager.$usedPercent.map { _ in () }.eraseToAnyPublisher(),
             openAIPlatformLoginManager.$isConnected.map { _ in () }.eraseToAnyPublisher(),
+            openAIPlatformLoginManager.$isMonitoringEnabled.map { _ in () }.eraseToAnyPublisher(),
             openAIPlatformLoginManager.$availableCredit.map { _ in () }.eraseToAnyPublisher(),
             antigravityManager.$snapshot.map { _ in () }.eraseToAnyPublisher(),
+            antigravityManager.$isConnected.map { _ in () }.eraseToAnyPublisher(),
+            antigravityManager.$isMonitoringEnabled.map { _ in () }.eraseToAnyPublisher(),
             NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
                 .map { _ in () }
                 .eraseToAnyPublisher()

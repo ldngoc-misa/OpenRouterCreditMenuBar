@@ -32,8 +32,16 @@ private struct OpenAIWeekRange {
 
 @MainActor
 final class OpenAIAPIManager: ObservableObject {
+    private static let monitoringDefaultsKey = "openai_api_monitoring_enabled"
+
     @Published private(set) var isLoading = false
-    @Published private(set) var isConnected = false
+    @Published private(set) var isConnected = false {
+        didSet {
+            guard oldValue != isConnected else { return }
+            setMonitoringEnabled(isConnected)
+        }
+    }
+    @Published private(set) var isMonitoringEnabled = UserDefaults.standard.bool(forKey: "openai_api_monitoring_enabled")
     @Published private(set) var usageErrorMessage: String?
     @Published private(set) var costsErrorMessage: String?
     @Published private(set) var lastUpdated: Date?
@@ -74,6 +82,15 @@ final class OpenAIAPIManager: ObservableObject {
 
     func setRefreshInterval(_ interval: TimeInterval) {
         refreshInterval = interval
+        setupRefreshTimer()
+    }
+
+    func setMonitoringEnabled(_ enabled: Bool) {
+        let shouldEnable = isConnected && enabled
+        if isMonitoringEnabled != shouldEnable {
+            isMonitoringEnabled = shouldEnable
+            userDefaults.set(shouldEnable, forKey: Self.monitoringDefaultsKey)
+        }
         setupRefreshTimer()
     }
 
@@ -284,7 +301,7 @@ final class OpenAIAPIManager: ObservableObject {
 
     private func setupRefreshTimer() {
         refreshTimer?.invalidate()
-        guard isConnected else { return }
+        guard isConnected && isMonitoringEnabled else { return }
         refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.refresh() }
         }

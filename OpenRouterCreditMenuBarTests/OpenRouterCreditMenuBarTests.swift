@@ -20,6 +20,62 @@ struct OpenRouterCreditMenuBarTests {
         #expect(MenuBarStatusFormatter.remainingPercent(fromUsedPercent: 17) == 83)
     }
 
+    @Test func openAISpendPrefersWebLoginAndFallsBackToAdminAPIKey() {
+        #expect(OpenAISpendResolver.preferredSpend(webLoginCost: 1.25, adminAPIKeyCost: 2.5) == 1.25)
+        #expect(OpenAISpendResolver.preferredSpend(webLoginCost: nil, adminAPIKeyCost: 2.5) == 2.5)
+        #expect(OpenAISpendResolver.preferredSpend(webLoginCost: 0, adminAPIKeyCost: 2.5) == 0)
+    }
+
+    @Test func openAIWebCostsSummarizeOnlyTheCurrentUTCDay() throws {
+        let date = ISO8601DateFormatter().date(from: "2026-10-26T07:30:00Z")!
+        let day = OpenAIPlatformCostCalculator.utcDayRange(for: date)
+        let previousDay = Int(day.start.timeIntervalSince1970) - 86_400
+        let currentDay = Int(day.start.timeIntervalSince1970)
+        let nextDay = Int(day.end.timeIntervalSince1970)
+        let data = Data("""
+        {
+          "data": [
+            {"start_time": \(previousDay), "results": [{"amount": {"value": 99.0}}]},
+            {"start_time": \(currentDay), "results": [
+              {"amount": {"value": 0.25}, "line_item": "API", "project_id": "project-1"},
+              {"amount": {"value": 0.75}, "line_item": null, "project_id": null}
+            ]},
+            {"start_time": \(nextDay), "results": [{"amount": {"value": 100.0}}]}
+          ],
+          "next_page": null
+        }
+        """.utf8)
+
+        let page = try JSONDecoder().decode(OpenAIPlatformCostPage.self, from: data)
+        let summary = OpenAIPlatformCostCalculator.summarize(buckets: page.data, during: day)
+
+        #expect(abs(summary.total - 1.0) < 0.000_001)
+        #expect(summary.breakdown.count == 2)
+        #expect(summary.breakdown.first?.lineItem == "Organization spend")
+        #expect(summary.breakdown.first?.todayAmount == 0.75)
+    }
+
+    @Test func openAIWebCostsReturnZeroForAnEmptyCurrentDayBucket() {
+        let date = ISO8601DateFormatter().date(from: "2026-10-26T07:30:00Z")!
+        let day = OpenAIPlatformCostCalculator.utcDayRange(for: date)
+        let bucket = OpenAIPlatformCostBucket(startTime: day.start.timeIntervalSince1970, results: [])
+
+        let summary = OpenAIPlatformCostCalculator.summarize(buckets: [bucket], during: day)
+
+        #expect(summary.total == 0)
+        #expect(summary.breakdown.isEmpty)
+    }
+
+    @Test func openAIWebCostDayRangeUsesUTCInsteadOfLocalDate() {
+        let date = ISO8601DateFormatter().date(from: "2026-10-26T00:30:00+07:00")!
+        let day = OpenAIPlatformCostCalculator.utcDayRange(for: date)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+
+        #expect(calendar.component(.day, from: day.start) == 25)
+        #expect(day.duration == 86_400)
+    }
+
     @Test func antigravityParserReadsNestedCreditsAndSortedModelQuotas() throws {
         let data = Data("""
         {
