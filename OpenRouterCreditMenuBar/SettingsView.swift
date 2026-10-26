@@ -89,39 +89,33 @@ struct SettingsView: View {
             }
 
             Section {
-                SettingsGroupCard(title: "Account", systemImage: "person.crop.circle") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        LabeledContent(
-                            "Signed in as",
-                            value: chatGPTManager.accountEmail
-                                ?? (chatGPTManager.isConnected ? "Email unavailable" : "Not connected")
-                        )
-                        HStack {
-                            Button(chatGPTManager.isConnected ? "Login ChatGPT" : "Connect ChatGPT") {
-                                chatGPTManager.openLogin()
-                                isShowingChatGPTLogin = true
-                            }
-                            if chatGPTManager.isConnected {
-                                Button("Disconnect", role: .destructive) { chatGPTManager.disconnect() }
-                            }
-                            if chatGPTManager.isConnected {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                    Text("Connected")
-                                }
-                                .font(.caption)
-                                .foregroundStyle(.green)
-                            }
-                            if chatGPTManager.isLoading {
-                                ProgressView().controlSize(.small)
-                            }
-                        }
-                        if let error = chatGPTManager.errorMessage {
-                            Label(error, systemImage: "exclamationmark.triangle")
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
+                HStack {
+                    Button(chatGPTManager.isConnected ? "Login ChatGPT" : "Connect ChatGPT") {
+                        chatGPTManager.openLogin()
+                        isShowingChatGPTLogin = true
                     }
+                    if chatGPTManager.isConnected {
+                        Button("Disconnect", role: .destructive) { chatGPTManager.disconnect() }
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Connected")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                    }
+                    if chatGPTManager.isLoading {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                LabeledContent(
+                    "Signed in as",
+                    value: chatGPTManager.accountEmail
+                        ?? (chatGPTManager.isConnected ? "Email unavailable" : "Not connected")
+                )
+                if let error = chatGPTManager.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
                 }
             } header: {
                 providerSectionHeader(
@@ -137,69 +131,12 @@ struct SettingsView: View {
             }
 
             Section {
-                SettingsGroupCard(title: "Platform API", systemImage: "chart.bar.xaxis") {
+                SettingsGroupCard(
+                    title: "Web Login",
+                    systemImage: "globe",
+                    description: "Shows available credit and today's spend for the selected organization."
+                ) {
                     VStack(alignment: .leading, spacing: 10) {
-                        SecureField("Admin API key", text: $openAIAdminAPIKey)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(maxWidth: .infinity)
-                            .onChange(of: openAIAdminAPIKey) { _, newValue in
-                                openAIAPIManager.adminAPIKey = newValue
-                            }
-                        HStack {
-                            Button("Test Connection") {
-                                Task { await openAIAPIManager.refresh() }
-                            }
-                            .disabled(openAIAdminAPIKey.isEmpty || openAIAPIManager.isLoading)
-
-                            if openAIAPIManager.isLoading {
-                                ProgressView().controlSize(.small)
-                            } else if openAIAPIManager.isConnected {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                    Text("Connected")
-                                }
-                                    .font(.caption)
-                                    .foregroundStyle(.green)
-                            }
-                        }
-                        if let error = openAIAPIManager.usageErrorMessage ?? openAIAPIManager.costsErrorMessage {
-                            Label(error, systemImage: "exclamationmark.triangle")
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-
-                        LabeledContent(
-                            "Account",
-                            value: openAIPlatformLoginManager.accountEmail
-                                ?? (openAIPlatformLoginManager.isConnected ? "Email unavailable" : "Not connected")
-                        )
-
-                        if openAIPlatformLoginManager.isConnected,
-                           openAIPlatformLoginManager.organizations.isEmpty {
-                            LabeledContent("Organization") {
-                                HStack {
-                                    Text(openAIPlatformLoginManager.isLoading ? "Loading…" : "Unavailable")
-                                        .foregroundStyle(.secondary)
-                                    Button("Refresh") {
-                                        openAIPlatformLoginManager.refreshAccount()
-                                    }
-                                }
-                            }
-                        } else if !openAIPlatformLoginManager.organizations.isEmpty {
-                            Picker(
-                                "Organization",
-                                selection: Binding(
-                                    get: { openAIPlatformLoginManager.selectedOrganizationID ?? "" },
-                                    set: { openAIPlatformLoginManager.selectOrganization($0) }
-                                )
-                            ) {
-                                ForEach(openAIPlatformLoginManager.organizations) { organization in
-                                    Text(organization.displayName).tag(organization.id)
-                                }
-                            }
-                            .disabled(openAIPlatformLoginManager.isLoading)
-                        }
-
                         HStack {
                             Button(openAIPlatformLoginManager.isConnected ? "Login OpenAI" : "Connect OpenAI") {
                                 openAIPlatformLoginManager.beginLogin()
@@ -220,7 +157,42 @@ struct SettingsView: View {
                                 ProgressView().controlSize(.small)
                             }
                         }
+                        Divider()
+                        LabeledContent(
+                            "Account",
+                            value: openAIPlatformLoginManager.accountEmail
+                                ?? (openAIPlatformLoginManager.isConnected ? "Email unavailable" : "Not connected")
+                        )
+
+                        if openAIPlatformLoginManager.isConnected,
+                           openAIPlatformLoginManager.organizations.isEmpty {
+                            Divider()
+                            LabeledContent("Organization") {
+                                HStack {
+                                    Text(openAIPlatformLoginManager.isLoading ? "Loading…" : "Unavailable")
+                                        .foregroundStyle(.secondary)
+                                    Button("Refresh") {
+                                        openAIPlatformLoginManager.refreshAccount()
+                                    }
+                                }
+                            }
+                        } else if !openAIPlatformLoginManager.organizations.isEmpty {
+                            Divider()
+                            Picker(
+                                "Organization",
+                                selection: Binding(
+                                    get: { openAIPlatformLoginManager.selectedOrganizationID ?? "" },
+                                    set: { openAIPlatformLoginManager.selectOrganization($0) }
+                                )
+                            ) {
+                                ForEach(openAIPlatformLoginManager.organizations) { organization in
+                                    Text(organization.displayName).tag(organization.id)
+                                }
+                            }
+                            .disabled(openAIPlatformLoginManager.isLoading)
+                        }
                         if let error = openAIPlatformLoginManager.errorMessage {
+                            Divider()
                             Label(error, systemImage: "exclamationmark.triangle")
                                 .font(.caption)
                                 .foregroundStyle(.red)
@@ -246,6 +218,47 @@ struct SettingsView: View {
                         }
                     )
                 )
+            }
+
+            Section {
+                SettingsGroupCard(
+                    title: "API Key",
+                    systemImage: "key.fill",
+                    description: "Loads token and request totals for today and this week, plus today's spend."
+                ) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        SecureField("Admin API key", text: $openAIAdminAPIKey)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: .infinity)
+                            .onChange(of: openAIAdminAPIKey) { _, newValue in
+                                openAIAPIManager.adminAPIKey = newValue
+                            }
+                        Divider()
+                        HStack {
+                            Button("Test Connection") {
+                                Task { await openAIAPIManager.refresh() }
+                            }
+                            .disabled(openAIAdminAPIKey.isEmpty || openAIAPIManager.isLoading)
+
+                            if openAIAPIManager.isLoading {
+                                ProgressView().controlSize(.small)
+                            } else if openAIAPIManager.isConnected {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                    Text("Connected")
+                                }
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                        if let error = openAIAPIManager.usageErrorMessage ?? openAIAPIManager.costsErrorMessage {
+                            Divider()
+                            Label(error, systemImage: "exclamationmark.triangle")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                }
             }
 
             Section {
@@ -332,6 +345,7 @@ struct SettingsView: View {
             Spacer(minLength: 8)
             Toggle("Enable \(title) credit monitoring", isOn: isMonitoringEnabled)
                 .labelsHidden()
+                .toggleStyle(.switch)
                 .disabled(!isConnected)
         }
     }
@@ -352,27 +366,38 @@ struct SettingsView: View {
 private struct SettingsGroupCard<Content: View>: View {
     private let title: String
     private let systemImage: String
+    private let description: String
     private let content: Content
 
     init(
         title: String,
         systemImage: String,
+        description: String,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.systemImage = systemImage
+        self.description = description
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label(title, systemImage: systemImage)
-                .font(.headline)
+            HStack(spacing: 6) {
+                Label(title, systemImage: systemImage)
+                    .font(.headline)
+
+                Image(systemName: "questionmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .help(description)
+                    .accessibilityLabel("About \(title)")
+                    .accessibilityHint(description)
+            }
 
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
     }
 }
 

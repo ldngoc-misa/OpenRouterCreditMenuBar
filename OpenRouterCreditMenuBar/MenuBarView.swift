@@ -1118,7 +1118,6 @@ private struct ChatGPTProviderView: View {
                     .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
                 }
             }
-            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .topLeading)
 
@@ -1278,7 +1277,6 @@ private struct OpenAIProviderView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(maxHeight: .infinity, alignment: .topLeading)
         }
